@@ -200,10 +200,10 @@ module.exports = function() {
 
         sinon.assert.calledOnce(createPoolStub);
         sinon.assert.calledWith(createPoolStub, 'pool', ['/dev/sdb']);
-        sinon.assert.calledOnce(msStub);
-        sinon.assert.calledWith(msStub, 'pool');
-        sinon.assert.calledOnce(putStub);
-        sinon.assert.calledWithMatch(putStub, {
+        sinon.assert.calledTwice(msStub);
+        sinon.assert.alwaysCalledWith(msStub, 'pool');
+        sinon.assert.calledTwice(putStub);
+        sinon.assert.calledWithMatch(putStub.firstCall, {
           body: {
             kind: 'MayastorPool',
             metadata: {
@@ -217,34 +217,16 @@ module.exports = function() {
             },
           },
         });
-      });
-
-      it('should not try to create a pool if the node has not been synced', async () => {
-        let node = new Node('node');
-        sinon.stub(node, 'isSynced').returns(false);
-        let createPoolStub = sinon.stub(node, 'createPool');
-        createPoolStub.resolves(
-          new Pool({
-            name: 'pool',
-            node: node,
-            disks: ['/dev/sdb'],
-            state: 'DEGRADED',
-            capacity: 100,
-            used: 10,
-          })
-        );
-        oper = await MockedPoolOperator([], [node]);
-        // trigger "new" event
-        oper.watcher.newObject(
-          createPoolResource('pool', 'node', ['/dev/sdb'])
-        );
-
-        // give event callbacks time to propagate
-        await sleep(10);
-
-        sinon.assert.notCalled(createPoolStub);
-        sinon.assert.notCalled(msStub);
-        sinon.assert.notCalled(putStub);
+        sinon.assert.calledWithMatch(putStub.secondCall, {
+          body: {
+            status: {
+              state: 'DEGRADED',
+              reason: '',
+              capacity: 100,
+              used: 10,
+            },
+          },
+        });
       });
 
       it('should not try to create a pool when pool with the same name already exists', async () => {
@@ -713,14 +695,24 @@ module.exports = function() {
         [node]
       );
 
-      sinon.assert.calledOnce(msStub);
-      sinon.assert.calledWith(msStub, 'pool');
-      sinon.assert.calledOnce(putStub);
-      sinon.assert.calledWithMatch(putStub, {
+      sinon.assert.calledTwice(msStub);
+      sinon.assert.alwaysCalledWith(msStub, 'pool');
+      sinon.assert.calledTwice(putStub);
+      sinon.assert.calledWithMatch(putStub.firstCall, {
         body: {
           status: {
             state: 'PENDING',
             reason: 'Creating the pool',
+          },
+        },
+      });
+      sinon.assert.calledWithMatch(putStub.secondCall, {
+        body: {
+          status: {
+            state: 'ONLINE',
+            reason: '',
+            capacity: 100,
+            used: 4,
           },
         },
       });
@@ -928,14 +920,24 @@ module.exports = function() {
       // Give event time to propagate
       await sleep(10);
 
-      sinon.assert.calledOnce(msStub);
-      sinon.assert.calledWith(msStub, 'pool');
-      sinon.assert.calledOnce(putStub);
-      sinon.assert.calledWithMatch(putStub, {
+      sinon.assert.calledTwice(msStub);
+      sinon.assert.alwaysCalledWith(msStub, 'pool');
+      sinon.assert.calledTwice(putStub);
+      sinon.assert.calledWithMatch(putStub.firstCall, {
         body: {
           status: {
             state: 'PENDING',
             reason: 'Creating the pool',
+          },
+        },
+      });
+      sinon.assert.calledWithMatch(putStub.secondCall, {
+        body: {
+          status: {
+            state: 'ONLINE',
+            reason: '',
+            capacity: 100,
+            used: 4,
           },
         },
       });

@@ -48,10 +48,6 @@ class Node extends EventEmitter {
   async createPool(name, disks) {
     // this method should typically be replaced by a sinon stub for testing
   }
-
-  isSynced() {
-    return true;
-  }
 }
 
 module.exports = Node;
