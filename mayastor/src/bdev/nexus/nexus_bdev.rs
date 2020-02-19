@@ -31,6 +31,7 @@ use crate::{
             nexus_channel::{DREvent, NexusChannel, NexusChannelInner},
             nexus_child::{ChildError, ChildState, NexusChild},
             nexus_io::{io_status, Bio},
+            nexus_iscsi::{IscsiError, IscsiTarget},
             nexus_label::LabelError,
             nexus_nbd::{NbdDisk, NbdError},
         },
@@ -63,6 +64,8 @@ pub enum Error {
     NotShared { name: String },
     #[snafu(display("Failed to share nexus {}", name))]
     ShareNexus { source: NbdError, name: String },
+    #[snafu(display("Failed to share iscsi nexus {}", name))]
+    ShareIscsiNexus { source: IscsiError, name: String },
     #[snafu(display("Failed to allocate label of nexus {}", name))]
     AllocLabel { source: DmaError, name: String },
     #[snafu(display("Failed to write label of nexus {}", name))]
@@ -188,6 +191,7 @@ pub struct Nexus {
     pub(crate) share_handle: Option<String>,
     /// vector of rebuild tasks
     pub rebuilds: Vec<RebuildTask>,
+    pub(crate) iscsi_target: Option<IscsiTarget>,
 }
 
 unsafe impl core::marker::Sync for Nexus {}
@@ -262,6 +266,7 @@ impl Nexus {
             dr_complete_notify: None,
             data_ent_offset: 0,
             nbd_disk: None,
+            iscsi_target: None,
             share_handle: None,
             size,
             rebuilds: Vec::new(),

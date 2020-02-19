@@ -83,13 +83,14 @@ fn target_name(uuid: &str) -> String {
 
 /// Create iscsi portal and initiator group which will be used later when
 /// creating iscsi targets.
-pub fn init(address: &str) -> Result<()> {
+pub fn init(address: &str, pg_no: c_int) -> Result<()> {
     let portal_host = CString::new(address.to_owned()).unwrap();
-    let portal_port = CString::new(ISCSI_PORT.to_string()).unwrap();
+    let port_no: u16 = pg_no as u16 + ISCSI_PORT;
+    let portal_port = CString::new(port_no.to_string()).unwrap();
     let initiator_host = CString::new("ANY").unwrap();
     let initiator_netmask = CString::new("ANY").unwrap();
 
-    let pg = unsafe { spdk_iscsi_portal_grp_create(0) };
+    let pg = unsafe { spdk_iscsi_portal_grp_create(pg_no) };
     if pg.is_null() {
         return Err(Error::CreatePortalGroup {});
     }
@@ -112,19 +113,21 @@ pub fn init(address: &str) -> Result<()> {
             return Err(Error::RegisterPortalGroup {});
         }
     }
-    debug!("Created default iscsi portal group");
+    info!("Created default iscsi portal group");
 
-    unsafe {
-        if spdk_iscsi_init_grp_create_from_initiator_list(
-            0,
-            1,
-            &mut (initiator_host.as_ptr() as *mut c_char) as *mut _,
-            1,
-            &mut (initiator_netmask.as_ptr() as *mut c_char) as *mut _,
-        ) != 0
-        {
-            spdk_iscsi_portal_grp_release(pg);
-            return Err(Error::CreateInitiatorGroup {});
+    if pg_no == 0 {
+        unsafe {
+            if spdk_iscsi_init_grp_create_from_initiator_list(
+                0,
+                1,
+                &mut (initiator_host.as_ptr() as *mut c_char) as *mut _,
+                1,
+                &mut (initiator_netmask.as_ptr() as *mut c_char) as *mut _,
+            ) != 0
+            {
+                spdk_iscsi_portal_grp_release(pg);
+                return Err(Error::CreateInitiatorGroup {});
+            }
         }
     }
     ADDRESS.with(move |addr| {
@@ -161,6 +164,7 @@ pub fn share(uuid: &str, bdev: &Bdev) -> Result<()> {
         *iscsi_idx.borrow_mut() = idx + 1;
         idx
     });
+    info!("Creating backend iscsi target {}", iqn);
     let tgt = unsafe {
         spdk_iscsi_tgt_node_construct(
             idx,
