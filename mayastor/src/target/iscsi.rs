@@ -17,13 +17,15 @@ use nix::errno::Errno;
 use snafu::{ResultExt, Snafu};
 
 use spdk_sys::{
-    spdk_bdev_get_name, spdk_iscsi_find_tgt_node,
+    //spdk_bdev_get_name, 
+    spdk_iscsi_find_tgt_node,
     spdk_iscsi_init_grp_create_from_initiator_list,
     spdk_iscsi_init_grp_destroy, spdk_iscsi_init_grp_unregister,
     spdk_iscsi_portal_create, spdk_iscsi_portal_grp_add_portal,
     spdk_iscsi_portal_grp_create, spdk_iscsi_portal_grp_open,
     spdk_iscsi_portal_grp_register, spdk_iscsi_portal_grp_release,
     spdk_iscsi_portal_grp_unregister, spdk_iscsi_shutdown_tgt_node_by_name,
+    spdk_iscsi_tgt_node,
     spdk_iscsi_tgt_node_construct,
 };
 
@@ -61,7 +63,13 @@ impl RpcErrorCode for Error {
 type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// iscsi target port number
-const ISCSI_PORT: u16 = 3260;
+pub const ISCSI_PORT_FE: u16 = 3260;
+pub const ISCSI_PORT_BE: u16 = 3261;
+
+pub const ISCSI_PORTAL_GROUP_FE: c_int = 0;
+pub const ISCSI_PORTAL_GROUP_BE: c_int = 1;
+
+pub const ISCSI_INITIATOR_GROUP: c_int = 0; //only 1 for now
 
 thread_local! {
     /// iscsi global state.
@@ -77,19 +85,17 @@ thread_local! {
 }
 
 /// Generate iqn based on provided uuid
-fn target_name(uuid: &str) -> String {
+pub fn target_name(uuid: &str) -> String {
     format!("iqn.2019-05.io.openebs:{}", uuid)
 }
 
-/// Create iscsi portal and initiator group which will be used later when
-/// creating iscsi targets.
-pub fn init(address: &str, pg_no: c_int) -> Result<()> {
-    let portal_host = CString::new(address.to_owned()).unwrap();
-    let port_no: u16 = pg_no as u16 + ISCSI_PORT;
-    let portal_port = CString::new(port_no.to_string()).unwrap();
-    let initiator_host = CString::new("ANY").unwrap();
-    let initiator_netmask = CString::new("ANY").unwrap();
+pub fn target_name_plus_portal(uuid: &str, portal_group: c_int) -> String {
+    format!("iqn.2019-05.io.openebs:{}:{}", uuid, portal_group)
+}
 
+pub fn init_portal_group(address: &str, port_no: u16, pg_no: c_int) -> Result<()> {
+    let portal_port = CString::new(port_no.to_string()).unwrap();
+    let portal_host = CString::new(address.to_owned()).unwrap();
     let pg = unsafe { spdk_iscsi_portal_grp_create(pg_no) };
     if pg.is_null() {
         return Err(Error::CreatePortalGroup {});
@@ -113,21 +119,37 @@ pub fn init(address: &str, pg_no: c_int) -> Result<()> {
             return Err(Error::RegisterPortalGroup {});
         }
     }
-    info!("Created default iscsi portal group");
+    info!("Created iscsi portal group {}", pg_no);
+    Ok(())
+}
 
-    if pg_no == 0 {
-        unsafe {
-            if spdk_iscsi_init_grp_create_from_initiator_list(
-                0,
-                1,
-                &mut (initiator_host.as_ptr() as *mut c_char) as *mut _,
-                1,
-                &mut (initiator_netmask.as_ptr() as *mut c_char) as *mut _,
-            ) != 0
-            {
-                spdk_iscsi_portal_grp_release(pg);
-                return Err(Error::CreateInitiatorGroup {});
-            }
+/// Create iscsi portal and initiator group which will be used later when
+/// creating iscsi targets.
+pub fn init(address: &str) -> Result<()> {
+    let initiator_host = CString::new("ANY").unwrap();
+    let initiator_netmask = CString::new("ANY").unwrap();
+
+    if let Err(msg) = init_portal_group(address, ISCSI_PORT_FE, ISCSI_PORTAL_GROUP_FE) {
+        error!("Failed to initialize Mayastor iSCSI target: {}", msg);
+        return Err(msg);
+    }
+    if let Err(msg) = init_portal_group(address, ISCSI_PORT_BE, ISCSI_PORTAL_GROUP_BE) {
+        error!("Failed to initialize Mayastor iSCSI target: {}", msg);
+        return Err(msg);
+    }
+    
+    unsafe {
+        if spdk_iscsi_init_grp_create_from_initiator_list(
+            ISCSI_INITIATOR_GROUP,
+            1,
+            &mut (initiator_host.as_ptr() as *mut c_char) as *mut _,
+            1,
+            &mut (initiator_netmask.as_ptr() as *mut c_char) as *mut _,
+        ) != 0
+        {
+            //spdk_iscsi_portal_grp_release(0);  // fixme
+            //spdk_iscsi_portal_grp_release(1);  // fixme
+            return Err(Error::CreateInitiatorGroup {});
         }
     }
     ADDRESS.with(move |addr| {
@@ -136,6 +158,50 @@ pub fn init(address: &str, pg_no: c_int) -> Result<()> {
     debug!("Created default iscsi initiator group");
 
     Ok(())
+}
+
+pub fn construct_iscsi_target(bdev_name: &str, pg_idx: c_int, ig_idx: c_int ) -> Result<*mut spdk_iscsi_tgt_node ,Error>{
+
+    let iqn = target_name_plus_portal(bdev_name, pg_idx);
+    let c_iqn = CString::new(iqn.clone()).unwrap();
+    let c_bdev_name = CString::new(bdev_name).unwrap();
+    let mut portal_group_idx = pg_idx;
+    let mut init_group_idx = ig_idx;
+    
+    let mut lun_id: c_int = 0;
+    let idx = ISCSI_IDX.with(move |iscsi_idx| {
+        let idx = *iscsi_idx.borrow();
+        *iscsi_idx.borrow_mut() = idx + 1;
+        idx
+    });
+
+    let tgt = unsafe {
+        spdk_iscsi_tgt_node_construct(
+            idx,                             // target_index
+            c_iqn.as_ptr(),                  // name
+            ptr::null(),                     // alias
+            &mut portal_group_idx as *mut _, // pg_tag_list
+            &mut init_group_idx as *mut _,   // ig_tag_list
+            1,                               // portal and initiator group list length
+            &mut c_bdev_name.as_ptr(),       // bdev name, how iscsi target gets associated with storage
+            &mut lun_id as *mut _,           // lun id
+            1,     // length of lun id list
+            128,   // max queue depth
+            false, // disable chap
+            false, // require chap
+            false, // mutual chap
+            0,     // chap group
+            false, // header digest
+            false, // data digest
+        )
+    };
+    if tgt.is_null() {
+        info!("Failed to create iscsi target {}", iqn);
+        Err(Error::CreateTarget {})
+    } else {
+        info!("Created iscsi target {}", iqn);
+        Ok(tgt)
+    }
 }
 
 /// Destroy iscsi default portal and initiator group.
@@ -154,55 +220,36 @@ pub fn fini() {
 
 /// Export given bdev over iscsi. That involves creating iscsi target and
 /// adding the bdev as LUN to it.
-pub fn share(uuid: &str, bdev: &Bdev) -> Result<()> {
-    let iqn = target_name(uuid);
-    let c_iqn = CString::new(iqn.clone()).unwrap();
-    let mut group_idx: c_int = 0;
-    let mut lun_id: c_int = 0;
-    let idx = ISCSI_IDX.with(move |iscsi_idx| {
-        let idx = *iscsi_idx.borrow();
-        *iscsi_idx.borrow_mut() = idx + 1;
-        idx
-    });
-    info!("Creating backend iscsi target {}", iqn);
-    let tgt = unsafe {
-        spdk_iscsi_tgt_node_construct(
-            idx,
-            c_iqn.as_ptr(),
-            ptr::null(),
-            &mut group_idx as *mut _,
-            &mut group_idx as *mut _,
-            1, // portal and initiator group list length
-            &mut spdk_bdev_get_name(bdev.as_ptr()),
-            &mut lun_id as *mut _,
-            1,     // length of lun id list
-            128,   // max queue depth
-            false, // disable chap
-            false, // require chap
-            false, // mutual chap
-            0,     // chap group
-            false, // header digest
-            false, // data digest
-        )
-    };
-    if tgt.is_null() {
-        Err(Error::CreateTarget {})
-    } else {
-        info!("Created iscsi target {}", iqn);
-        Ok(())
+pub fn share(uuid: &str, _bdev: &Bdev) -> Result<()> {
+
+    let tgt = construct_iscsi_target(uuid, ISCSI_PORTAL_GROUP_BE, ISCSI_INITIATOR_GROUP);
+
+    match tgt {
+        Ok(_tgt) => {
+            info!(
+                "(start) done creating iscsi backend target for {}",
+                uuid
+            );
+            return Ok(())
+        },
+        Err(_) => return Err(Error::CreateTarget{}),
     }
 }
 
-/// Undo export of a bdev over iscsi done above.
 pub async fn unshare(uuid: &str) -> Result<()> {
+    unshare_generic(uuid, ISCSI_PORTAL_GROUP_BE).await
+}
+
+/// Undo export of a bdev over iscsi done above.
+pub async fn unshare_generic(uuid: &str, pg_idx: c_int) -> Result<()> {
     let (sender, receiver) = oneshot::channel::<ErrnoResult<()>>();
-    let iqn = target_name(uuid);
+    let iqn = target_name_plus_portal(uuid, pg_idx);
     let c_iqn = CString::new(iqn.clone()).unwrap();
 
-    debug!("Destroying iscsi target {}", iqn);
+    info!("Destroying iscsi target {}", iqn);
 
     unsafe {
-        spdk_iscsi_shutdown_tgt_node_by_name(
+        spdk_iscsi_shutdown_tgt_node_by_name( // the name is whatever is int target->name, doesn't have to be iqn
             c_iqn.as_ptr(),
             Some(done_errno_cb),
             cb_arg(sender),
@@ -229,6 +276,6 @@ pub fn get_uri(uuid: &str) -> Option<String> {
     ADDRESS.with(move |a| {
         let a_borrow = a.borrow();
         let address = a_borrow.as_ref().unwrap();
-        Some(format!("iscsi://{}:{}/{}", address, ISCSI_PORT, iqn))
+        Some(format!("iscsi://{}:{}/{}", address, ISCSI_PORT_BE, iqn))
     })
 }
