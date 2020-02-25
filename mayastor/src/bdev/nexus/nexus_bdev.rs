@@ -15,10 +15,18 @@ use serde::Serialize;
 use snafu::{ResultExt, Snafu};
 
 use spdk_sys::{
-    spdk_bdev, spdk_bdev_desc, spdk_bdev_io, spdk_bdev_io_get_buf,
-    spdk_bdev_readv_blocks, spdk_bdev_register, spdk_bdev_unmap_blocks,
-    spdk_bdev_unregister, spdk_bdev_writev_blocks, spdk_io_channel,
-    spdk_io_device_register, spdk_io_device_unregister,
+    spdk_bdev,
+    spdk_bdev_desc,
+    spdk_bdev_io,
+    spdk_bdev_io_get_buf,
+    spdk_bdev_readv_blocks,
+    spdk_bdev_register,
+    spdk_bdev_unmap_blocks,
+    spdk_bdev_unregister,
+    spdk_bdev_writev_blocks,
+    spdk_io_channel,
+    spdk_io_device_register,
+    spdk_io_device_unregister,
 };
 
 use rpc::mayastor::{RebuildProgressReply, RebuildStateReply};
@@ -180,9 +188,6 @@ impl RpcErrorCode for Error {
             Error::ChildNotFound {
                 ..
             } => Code::NotFound,
-            Error::InvalidShareProtocol {
-                ..
-            } => Code::InvalidParams,
             _ => Code::InternalError,
         }
     }
@@ -637,7 +642,7 @@ impl Nexus {
         desc: *mut spdk_bdev_desc,
         ch: *mut spdk_io_channel,
     ) -> i32 {
-        info!("attempting a read\n");
+        //info!("attempting a read\n");
         let io = Bio(pio);
         let nexus = io.nexus_as_ref();
         unsafe {

@@ -106,7 +106,7 @@ pub fn find_unused() -> Result<String, NbdError> {
         parse_value(Path::new("/sys/class/modules/nbd/parameters"), "nbds_max")
             .unwrap_or(16);
 
-    for i in 0..nbd_max {
+    for i in 0 .. nbd_max {
         let name = format!("nbd{}", i);
         match parse_value::<u32>(
             Path::new(&format!("/sys/class/block/{}", name)),
@@ -214,7 +214,9 @@ impl NbdDisk {
         wait_until_ready(&device_path).unwrap();
         info!("Started nbd disk {} for {}", device_path, bdev_name);
 
-        Ok(Self { nbd_ptr })
+        Ok(Self {
+            nbd_ptr,
+        })
     }
 
     /// Stop and release nbd device.
