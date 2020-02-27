@@ -166,10 +166,9 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             &call::<_, PublishNexusReply>(
                 &opt.socket,
                 "publish_nexus",
-                Some(json!({
-                    "uuid": uuid,
+                Some(json!({ "uuid": uuid,
+                    "share" : ShareProtocol::Nbd as i32,
                     "key" : key,
-                    "share" : ShareProtocol::None as i32,
                 })),
             )
             .await?,

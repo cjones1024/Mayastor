@@ -140,22 +140,49 @@ pub enum Error {
         name: String,
         reason: String,
     },
+    #[snafu(display("Invalid ShareProtocol value {}", sp_value))]
+    InvalidShareProtocol { sp_value: i32},
 }
 
 impl RpcErrorCode for Error {
     fn rpc_error_code(&self) -> Code {
         match self {
-            Error::NexusNotFound { .. } => Code::NotFound,
-            Error::InvalidUuid { .. } => Code::InvalidParams,
-            Error::InvalidKey { .. } => Code::InvalidParams,
-            Error::AlreadyShared { .. } => Code::InvalidParams,
-            Error::NotShared { .. } => Code::InvalidParams,
-            Error::CreateChild { .. } => Code::InvalidParams,
-            Error::MixedBlockSizes { .. } => Code::InvalidParams,
-            Error::ChildGeometry { .. } => Code::InvalidParams,
-            Error::OpenChild { .. } => Code::InvalidParams,
-            Error::DestroyLastChild { .. } => Code::InvalidParams,
-            Error::ChildNotFound { .. } => Code::NotFound,
+            Error::NexusNotFound {
+                ..
+            } => Code::NotFound,
+            Error::InvalidUuid {
+                ..
+            } => Code::InvalidParams,
+            Error::InvalidKey {
+                ..
+            } => Code::InvalidParams,
+            Error::AlreadyShared {
+                ..
+            } => Code::InvalidParams,
+            Error::NotShared {
+                ..
+            } => Code::InvalidParams,
+            Error::CreateChild {
+                ..
+            } => Code::InvalidParams,
+            Error::MixedBlockSizes {
+                ..
+            } => Code::InvalidParams,
+            Error::ChildGeometry {
+                ..
+            } => Code::InvalidParams,
+            Error::OpenChild {
+                ..
+            } => Code::InvalidParams,
+            Error::DestroyLastChild {
+                ..
+            } => Code::InvalidParams,
+            Error::ChildNotFound {
+                ..
+            } => Code::NotFound,
+            Error::InvalidShareProtocol {
+                ..
+            } => Code::InvalidParams,
             _ => Code::InternalError,
         }
     }
