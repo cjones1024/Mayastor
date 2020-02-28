@@ -42,12 +42,12 @@ impl Nexus {
         }
 
         assert_eq!(self.share_handle, None);
-        let _ = match share_proto {
+        match share_proto {
             ShareProtocol::Nvmf => (),
             ShareProtocol::Iscsi => (),
             ShareProtocol::Nbd => (),
             _ => return Err(Error::InvalidShareProtocol {sp_value: share_proto as i32}),
-        };
+        }
 
         self.share_protocol = share_proto;
 
@@ -115,49 +115,39 @@ impl Nexus {
     /// bdev. As such, we must first destroy the share and move our way down
     /// from there.
     pub async fn unshare(&mut self) -> Result<(), Error> {
-        if !ISCSI_FRONT_END {
-            match self.nbd_disk.take() {
-                Some(disk) => {
-                    disk.destroy();
-                    let bdev_name = self.share_handle.take().unwrap();
-                    if let Some(bdev) = Bdev::lookup_by_name(&bdev_name) {
-                        // if the share handle is the same as bdev name it
-                        // implies there is no top level bdev, and we are done
-                        if self.name != bdev.name() {
-                            let (s, r) = oneshot::channel::<ErrnoResult<()>>();
-                            // currently, we only have the crypto vbdev
-                            unsafe {
-                                spdk_sys::delete_crypto_disk(
-                                    bdev.as_ptr(),
-                                    Some(done_errno_cb),
-                                    cb_arg(s),
-                                );
-                            }
-                            r.await
-                                .expect("crypto delete sender is gone")
-                                .context(DestroyCryptoBdev {
-                                    name: self.name.clone(),
-                                })?;
+        match self.nbd_disk.take() {
+            Some(disk) => {
+                let sp = match self.share_protocol {
+                    ShareProtocol::Nbd => Some(ShareProtocol::Nvmf),
+                    ShareProtocol::Iscsi => Some(ShareProtocol::Nvmf),
+                    ShareProtocol::Nvmf => Some(ShareProtocol::Nvmf),
+                    _ => None
+                };
+
+                if sp.is_none() {return Err(Error::NotShared { name: self.name.clone(),});}
+
+                disk.destroy();
+                let bdev_name = self.share_handle.take().unwrap();
+                if let Some(bdev) = Bdev::lookup_by_name(&bdev_name) {
+                    // if the share handle is the same as bdev name it
+                    // implies there is no top level bdev, and we are done
+                    if self.name != bdev.name() {
+                        let (s, r) = oneshot::channel::<ErrnoResult<()>>();
+                        // currently, we only have the crypto vbdev
+                        unsafe {
+                            spdk_sys::delete_crypto_disk(
+                                bdev.as_ptr(),
+                                Some(done_errno_cb),
+                                cb_arg(s),
+                            );
                         }
                     } else {
                         warn!("Missing bdev for a shared device");
                     }
                     Ok(())
                 }
-                None => Err(Error::NotShared {
-                    name: self.name.clone(),
-                }),
-            }
-        } else {
-            match self.iscsi_target.take() {
-                Some(iscsi_target) => {
-                    info!("Unsharing iscsi replica");
-                    iscsi_target.destroy().await;
-                    Ok(())    
-                }
-                None => Err(Error::NotShared {
-                    name: self.name.clone(),
-                }),
+                self.share_protocol = ShareProtocol::None;
+                Ok(())
             }
         }
     }
