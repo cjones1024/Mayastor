@@ -55,6 +55,10 @@ use rpc::mayastor::{
     ShareProtocol,
 };
 
+use rpc::mayastor::{
+    ShareProtocol,
+};
+
 /// Common errors for nexus basic operations and child operations
 /// which are part of nexus object.
 #[derive(Debug, Snafu)]
@@ -227,9 +231,10 @@ pub struct Nexus {
     pub(crate) share_handle: Option<String>,
     /// vector of rebuild tasks
     pub rebuilds: Vec<RebuildTask>,
-    pub(crate) iscsi_target: Option<IscsiTarget>,
     /// frontend share protocol used when the nexus is published
     pub share_protocol: ShareProtocol,
+    /// iscsi target which the nexus is exposed through
+    pub(crate) iscsi_target: Option<IscsiTarget>,
 }
 
 unsafe impl core::marker::Sync for Nexus {}
