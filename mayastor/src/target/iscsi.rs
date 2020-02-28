@@ -96,13 +96,18 @@ pub fn target_name(uuid: &str) -> String {
 /// Create iscsi portal and initiator group which will be used later when
 /// creating iscsi targets.
 pub fn init(address: &str) -> Result<()> {
+
+    if let Err(e) = init_portal_group(address, ISCSI_PORT_BE, ISCSI_PORTAL_GROUP_BE) {
+        destroy_iscsi_groups();
+        return Err(e);
+    }
+    if let Err(e) = init_portal_group(address, ISCSI_PORT_FE, ISCSI_PORTAL_GROUP_FE) {
+        destroy_iscsi_groups();
+        return Err(e);
+    }
+
     let initiator_host = CString::new("ANY").unwrap();
     let initiator_netmask = CString::new("ANY").unwrap();
-
-    info!("Creating portal group for address {}", address);
-
-    init_portal_group(address, ISCSI_PORT_BE, ISCSI_PORTAL_GROUP_BE)?;
-    init_portal_group(address, ISCSI_PORT_FE, ISCSI_PORTAL_GROUP_FE)?;
 
     unsafe {
         if spdk_iscsi_init_grp_create_from_initiator_list(
@@ -113,34 +118,38 @@ pub fn init(address: &str) -> Result<()> {
             &mut (initiator_netmask.as_ptr() as *mut c_char) as *mut _,
         ) != 0
         {
-            fini();
+            destroy_iscsi_groups();
             return Err(Error::CreateInitiatorGroup {});
         }
     }
     ADDRESS.with(move |addr| {
         *addr.borrow_mut() = Some(address.to_owned());
     });
-    debug!("Created default iscsi initiator group");
+    debug!("Created default iscsi initiator group and portal groups for address {}", address);
 
     Ok(())
 }
 
 /// Destroy iscsi default portal and initiator group.
-pub fn fini() {
+fn destroy_iscsi_groups() {
     unsafe {
-        let ig = spdk_iscsi_init_grp_unregister(0);
+        let ig = spdk_iscsi_init_grp_unregister(ISCSI_INITIATOR_GROUP);
         if !ig.is_null() {
             spdk_iscsi_init_grp_destroy(ig);
         }
-        let pg0 = spdk_iscsi_portal_grp_unregister(0);
+        let pg0 = spdk_iscsi_portal_grp_unregister(ISCSI_PORTAL_GROUP_FE);
         if !pg0.is_null() {
             spdk_iscsi_portal_grp_release(pg0);
         }
-        let pg1 = spdk_iscsi_portal_grp_unregister(1);
+        let pg1 = spdk_iscsi_portal_grp_unregister(ISCSI_PORTAL_GROUP_BE);
         if !pg1.is_null() {
             spdk_iscsi_portal_grp_release(pg1);
         }
     }
+}
+
+pub fn fini() {
+    destroy_iscsi_groups();
 }
 
 /// Export given bdev over iscsi. That involves creating iscsi target and
@@ -151,11 +160,8 @@ pub fn share(uuid: &str, _bdev: &Bdev) -> Result<()> {
 
     match tgt {
         Ok(_tgt) => {
-            info!(
-                "(start) done creating iscsi backend target for {}",
-                uuid
-            );
-            return Ok(())
+            info!("Created iscsi backend target for {}", uuid );
+            Ok(())
         },
         Err(_) => return Err(Error::CreateTarget{}),
     }
@@ -220,7 +226,7 @@ pub fn construct_iscsi_target(bdev_name: &str, pg_idx: c_int, ig_idx: c_int ) ->
         )
     };
     if tgt.is_null() {
-        info!("Failed to create iscsi target {}", iqn);
+        error!("Failed to create iscsi target {}", iqn);
         Err(Error::CreateTarget {})
     } else {
         info!("Created iscsi target {}", iqn);
