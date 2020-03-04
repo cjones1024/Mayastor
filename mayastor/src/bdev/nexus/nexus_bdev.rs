@@ -39,7 +39,7 @@ use crate::{
             nexus_channel::{DREvent, NexusChannel, NexusChannelInner},
             nexus_child::{ChildError, ChildState, NexusChild},
             nexus_io::{io_status, Bio},
-            nexus_iscsi::{IscsiError, IscsiTarget},
+            nexus_iscsi::{NexusIscsiError, NexusIscsiTarget},
             nexus_label::LabelError,
             nexus_nbd::{NbdDisk, NbdError},
         },
@@ -78,10 +78,10 @@ pub enum Error {
     AlreadyShared { name: String },
     #[snafu(display("The nexus {} has not been shared", name))]
     NotShared { name: String },
-    #[snafu(display("Failed to share nexus {}", name))]
-    ShareNexus { source: NbdError, name: String },
+    #[snafu(display("Failed to share NBD nexus {}", name))]
+    ShareNbdNexus { source: NbdError, name: String },
     #[snafu(display("Failed to share iscsi nexus {}", name))]
-    ShareIscsiNexus { source: IscsiError, name: String },
+    ShareIscsiNexus { source: NexusIscsiError, name: String },
     #[snafu(display("Failed to allocate label of nexus {}", name))]
     AllocLabel { source: DmaError, name: String },
     #[snafu(display("Failed to write label of nexus {}", name))]
@@ -234,7 +234,7 @@ pub struct Nexus {
     /// frontend share protocol used when the nexus is published
     pub share_protocol: ShareProtocol,
     /// iscsi target which the nexus is exposed through
-    pub(crate) iscsi_target: Option<IscsiTarget>,
+    pub(crate) iscsi_target: Option<NexusIscsiTarget>,
 }
 
 unsafe impl core::marker::Sync for Nexus {}
@@ -654,7 +654,6 @@ impl Nexus {
         desc: *mut spdk_bdev_desc,
         ch: *mut spdk_io_channel,
     ) -> i32 {
-        //info!("attempting a read\n");
         let io = Bio(pio);
         let nexus = io.nexus_as_ref();
         unsafe {

@@ -34,7 +34,7 @@ use spdk_sys::{
 };
 
 use crate::{
-    core::Bdev,
+    core::{Bdev, Side},
     ffihelper::{cb_arg, done_errno_cb, ErrnoResult},
     jsonrpc::{Code, RpcErrorCode},
 };
@@ -67,13 +67,13 @@ impl RpcErrorCode for Error {
 type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// iscsi target port number
-pub const ISCSI_PORT_FE: u16 = 3260;
-pub const ISCSI_PORT_BE: u16 = 3262;
+const ISCSI_PORT_FE: u16 = 3260;
+const ISCSI_PORT_BE: u16 = 3262;
 
-pub const ISCSI_PORTAL_GROUP_FE: c_int = 0;
-pub const ISCSI_PORTAL_GROUP_BE: c_int = 2;
+const ISCSI_PORTAL_GROUP_FE: c_int = 0;
+const ISCSI_PORTAL_GROUP_BE: c_int = 2;
 
-pub const ISCSI_INITIATOR_GROUP: c_int = 0; //only 1 for now
+const ISCSI_INITIATOR_GROUP: c_int = 0; //only 1 for now
 
 thread_local! {
     /// iscsi global state.
@@ -97,30 +97,17 @@ pub fn target_name(uuid: &str) -> String {
 /// creating iscsi targets.
 pub fn init(address: &str) -> Result<()> {
 
-    if let Err(e) = init_portal_group(address, ISCSI_PORT_BE, ISCSI_PORTAL_GROUP_BE) {
-        destroy_iscsi_groups();
+    if let Err(e) = create_portal_group(address, ISCSI_PORT_BE, ISCSI_PORTAL_GROUP_BE) {
         return Err(e);
     }
-    if let Err(e) = init_portal_group(address, ISCSI_PORT_FE, ISCSI_PORTAL_GROUP_FE) {
-        destroy_iscsi_groups();
+    if let Err(e) = create_portal_group(address, ISCSI_PORT_FE, ISCSI_PORTAL_GROUP_FE) {
+        destroy_portal_group(ISCSI_PORTAL_GROUP_BE);
         return Err(e);
     }
-
-    let initiator_host = CString::new("ANY").unwrap();
-    let initiator_netmask = CString::new("ANY").unwrap();
-
-    unsafe {
-        if spdk_iscsi_init_grp_create_from_initiator_list(
-            ISCSI_INITIATOR_GROUP,
-            1,
-            &mut (initiator_host.as_ptr() as *mut c_char) as *mut _,
-            1,
-            &mut (initiator_netmask.as_ptr() as *mut c_char) as *mut _,
-        ) != 0
-        {
-            destroy_iscsi_groups();
-            return Err(Error::CreateInitiatorGroup {});
-        }
+    if let Err(e) = create_initiator_group(ISCSI_INITIATOR_GROUP) {
+        destroy_portal_group(ISCSI_PORTAL_GROUP_BE);
+        destroy_portal_group(ISCSI_PORTAL_GROUP_FE);
+        return Err(e);
     }
     ADDRESS.with(move |addr| {
         *addr.borrow_mut() = Some(address.to_owned());
@@ -132,20 +119,9 @@ pub fn init(address: &str) -> Result<()> {
 
 /// Destroy iscsi portal and initiator groups.
 fn destroy_iscsi_groups() {
-    unsafe {
-        let ig = spdk_iscsi_init_grp_unregister(ISCSI_INITIATOR_GROUP);
-        if !ig.is_null() {
-            spdk_iscsi_init_grp_destroy(ig);
-        }
-        let pg0 = spdk_iscsi_portal_grp_unregister(ISCSI_PORTAL_GROUP_FE);
-        if !pg0.is_null() {
-            spdk_iscsi_portal_grp_release(pg0);
-        }
-        let pg1 = spdk_iscsi_portal_grp_unregister(ISCSI_PORTAL_GROUP_BE);
-        if !pg1.is_null() {
-            spdk_iscsi_portal_grp_release(pg1);
-        }
-    }
+    destroy_initiator_group(ISCSI_INITIATOR_GROUP);
+    destroy_portal_group(ISCSI_PORTAL_GROUP_FE);
+    destroy_portal_group(ISCSI_PORTAL_GROUP_BE);
 }
 
 pub fn fini() {
@@ -154,15 +130,14 @@ pub fn fini() {
 
 /// Export given bdev over iscsi. That involves creating iscsi target and
 /// adding the bdev as LUN to it.
-pub fn share(uuid: &str, bdev: &Bdev) -> Result<()> {
+pub fn share(uuid: &str, bdev: &Bdev, side: Side) -> Result<()> {
 
-    match construct_iscsi_target(uuid, bdev, ISCSI_PORTAL_GROUP_BE, ISCSI_INITIATOR_GROUP) {
-        Ok(tgt) => {
-            info!("Created iscsi backend target {} for {}", tgt, uuid );
-            Ok(())
-        },
-        Err(_) => return Err(Error::CreateTarget{}),
-    }
+    let iqn = match side {
+        Side::FrontEnd => construct_iscsi_target(uuid, bdev, ISCSI_PORTAL_GROUP_FE, ISCSI_INITIATOR_GROUP)?,
+        Side::BackEnd => construct_iscsi_target(uuid, bdev, ISCSI_PORTAL_GROUP_BE, ISCSI_INITIATOR_GROUP)?,
+    };
+    info!("Created iscsi target {} for {}", iqn, uuid );
+    Ok(())
 }
 
 /// Undo export of a bdev over iscsi done above.
@@ -188,7 +163,7 @@ pub async fn unshare(uuid: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn construct_iscsi_target(bdev_name: &str, bdev: &Bdev, pg_idx: c_int, ig_idx: c_int ) -> Result<String ,Error>{
+fn construct_iscsi_target(bdev_name: &str, bdev: &Bdev, pg_idx: c_int, ig_idx: c_int ) -> Result<String ,Error>{
 
     let iqn = target_name(bdev_name);
     let c_iqn = CString::new(iqn.clone()).unwrap();
@@ -231,7 +206,36 @@ pub fn construct_iscsi_target(bdev_name: &str, bdev: &Bdev, pg_idx: c_int, ig_id
     }
 }
 
-pub fn init_portal_group(address: &str, port_no: u16, pg_no: c_int) -> Result<()> {
+fn create_initiator_group(ig_idx: c_int) -> Result<()> {
+    let initiator_host = CString::new("ANY").unwrap();
+    let initiator_netmask = CString::new("ANY").unwrap();
+
+    unsafe {
+        if spdk_iscsi_init_grp_create_from_initiator_list(
+            ig_idx,
+            1,
+            &mut (initiator_host.as_ptr() as *mut c_char) as *mut _,
+            1,
+            &mut (initiator_netmask.as_ptr() as *mut c_char) as *mut _,
+        ) != 0
+        {
+            destroy_iscsi_groups();
+            return Err(Error::CreateInitiatorGroup {});
+        }
+    }
+    Ok(())
+}
+
+fn destroy_initiator_group(ig_idx: c_int) {
+    unsafe {
+        let ig = spdk_iscsi_init_grp_unregister(ig_idx);
+        if !ig.is_null() {
+            spdk_iscsi_init_grp_destroy(ig);
+        }
+    }
+}
+
+fn create_portal_group(address: &str, port_no: u16, pg_no: c_int) -> Result<()> {
     let portal_port = CString::new(port_no.to_string()).unwrap();
     let portal_host = CString::new(address.to_owned()).unwrap();
     let pg = unsafe { spdk_iscsi_portal_grp_create(pg_no) };
@@ -261,7 +265,16 @@ pub fn init_portal_group(address: &str, port_no: u16, pg_no: c_int) -> Result<()
     Ok(())
 }
 
-/// Return iscsi target URI understood by nexus
+fn destroy_portal_group(pg_idx: c_int) {
+    unsafe {
+        let pg = spdk_iscsi_portal_grp_unregister(pg_idx);
+        if !pg.is_null() {
+            spdk_iscsi_portal_grp_release(pg);
+        }
+    }
+}
+
+/// Return iscsi backend target URI understood by nexus
 pub fn get_uri(uuid: &str) -> Option<String> {
     let iqn = target_name(uuid);
     let c_iqn = CString::new(iqn.clone()).unwrap();
