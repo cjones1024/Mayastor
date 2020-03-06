@@ -183,7 +183,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                 &opt.socket,
                 "publish_nexus",
                 Some(json!({ "uuid": uuid,
-                    "share" : protocol,
+                    "share" : protocol as i32,
                     "key" : key,
                 })),
             )
