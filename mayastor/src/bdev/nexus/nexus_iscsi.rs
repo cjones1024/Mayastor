@@ -27,7 +27,7 @@ pub struct NexusIscsiTarget {
 impl NexusIscsiTarget {
     /// Allocate iscsi device for the bdev and start it.
     /// When the function returns the iscsi target is ready for IO.
-    pub async fn create(bdev_name: &str) -> Result<Self, NexusIscsiError> {
+    pub fn create(bdev_name: &str) -> Result<Self, NexusIscsiError> {
 
         let bdev = match Bdev::lookup_by_name(bdev_name) {
             None => return Err(NexusIscsiError::BdevNotFound{ dev: bdev_name.to_string() }),
@@ -51,7 +51,7 @@ impl NexusIscsiTarget {
     }
 
     pub fn get_iqn(&self) -> String {
-        return target_name(&self.bdev_name);
+        target_name(&self.bdev_name)
     }
 }
 
