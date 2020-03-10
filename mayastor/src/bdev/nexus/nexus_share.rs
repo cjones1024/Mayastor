@@ -23,7 +23,7 @@ use crate::{
 };
 
 use rpc::mayastor::{
-    ShareProtocol,
+    ShareProtocolNexus,
 };
 
 /// we are using the multi buffer encryption implementation using CBC as the
@@ -33,18 +33,17 @@ const CRYPTO_FLAVOUR: &str = "crypto_aesni_mb";
 impl Nexus {
     pub async fn share(
         &mut self,
-        share_protocol: ShareProtocol,
+        share_protocol: ShareProtocolNexus,
         key: Option<String>,
     ) -> Result<String, Error> {
-
-        assert_eq!(self.share_handle, None);
-        validate_frontend_protocol(share_protocol)?;
-
-        if self.iscsi_target.is_some() || self.nbd_disk.is_some() {
+        if self.share_protocol.is_some() {
             return Err(Error::AlreadyShared {
                 name: self.name.clone(),
             });
         }
+
+        assert_eq!(self.share_handle, None);
+
 
         // TODO for now we discard and ignore share_proto
 
