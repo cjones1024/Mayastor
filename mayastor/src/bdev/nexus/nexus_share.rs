@@ -12,6 +12,7 @@ use crate::{
             DestroyCryptoBdev,
             Error,
             Nexus,
+            NexusTarget,
             ShareIscsiNexus,
             ShareNbdNexus,
         },
@@ -36,10 +37,32 @@ impl Nexus {
         share_protocol: ShareProtocolNexus,
         key: Option<String>,
     ) -> Result<String, Error> {
-        if self.share_protocol.is_some() {
-            return Err(Error::AlreadyShared {
-                name: self.name.clone(),
-            });
+
+        assert_eq!(self.share_handle, None);
+
+        // We could already be shared -- as CSI is idempotent chances are we get called for some odd reason.
+        // Validate indeed -- that we are shared by walking the target.
+        // If so, and the protocol is correct simply return Ok().
+        // If so, and the protocol is incorrect, return Error().
+        // If we are not shared but the variant says we should be, carry on to correct the state.
+        match self.nexus_target {
+            Some(NexusTarget::NbdDisk( ref nbd_disk )) => {
+                if share_protocol != ShareProtocolNexus::NexusNbd {
+                    return Err(Error::AlreadyShared { name: self.name.clone(),});
+                } else {
+                    warn!("{} is already shared", self.name);
+                    return Ok(nbd_disk.get_path());
+                }
+            },
+            Some(NexusTarget::NexusIscsiTarget( ref iscsi_target )) => {
+                if share_protocol != ShareProtocolNexus::NexusIscsi {
+                    return Err(Error::AlreadyShared { name: self.name.clone(),});
+                } else {
+                    warn!("{} is already shared", self.name);
+                    return Ok(iscsi_target.get_iqn());
+                }
+            },
+            None => (),
         }
 
         let name = if let Some(key) = key {
@@ -82,7 +105,7 @@ impl Nexus {
                         name: self.name.clone(),
                     })?;
                 let device_path = nbd_disk.get_path();
-                self.nbd_disk = Some(nbd_disk);
+                self.nexus_target = Some(NexusTarget::NbdDisk( nbd_disk ));
                 device_path
             },
             ShareProtocolNexus::NexusIscsi => {
@@ -92,7 +115,7 @@ impl Nexus {
                         name: self.name.clone(),
                     })?;
                 let iqn = iscsi_target.get_iqn();
-                self.iscsi_target = Some(iscsi_target);
+                self.nexus_target = Some(NexusTarget::NexusIscsiTarget( iscsi_target ));
                 iqn
             },
             ShareProtocolNexus::NexusNvmf => {
@@ -101,7 +124,6 @@ impl Nexus {
             _ => return Err(Error::InvalidShareProtocol {sp_value: share_protocol as i32}),
         };
         self.share_handle = Some(name);
-        self.share_protocol = Some(share_protocol);
         Ok(device_id)
     }
 
@@ -110,31 +132,18 @@ impl Nexus {
     /// bdev. As such, we must first destroy the share and move our way down
     /// from there.
     pub async fn unshare(&mut self) -> Result<(), Error> {
-        match self.share_protocol {
-            Some(ShareProtocolNexus::NexusNbd) =>  {
-                match self.nbd_disk.take() {
-                    Some(disk) => {
-                        disk.destroy();
-                    },
-                    None => return Err(Error::NotShared {
-                        name: self.name.clone(),
-                    }),
-                }
+
+        match self.nexus_target.take() {
+            Some(NexusTarget::NbdDisk( disk )) =>  {
+                disk.destroy();
             },
-            Some(ShareProtocolNexus::NexusIscsi) => {
-                match self.iscsi_target.take() {
-                    Some(iscsi_target) => {
-                        iscsi_target.destroy().await;
-                    },
-                    None => return Err(Error::NotShared {
-                        name: self.name.clone(),
-                    }),
-                }
+            Some(NexusTarget::NexusIscsiTarget(iscsi_target)) => {
+                iscsi_target.destroy().await;
             },
-            Some(ShareProtocolNexus::NexusNvmf) => {
-                return Err(Error::InvalidShareProtocol {sp_value: self.share_protocol.unwrap() as i32})
-            },
-            _ => return Err(Error::InvalidShareProtocol {sp_value: self.share_protocol as i32}),
+            None =>  {
+                warn!("{} was not shared", self.name);
+                return Ok(());
+            }
         };
 
         let bdev_name = self.share_handle.take().unwrap();
@@ -161,16 +170,15 @@ impl Nexus {
         } else {
             warn!("Missing bdev for a shared device");
         }
-        self.share_protocol = ShareProtocol::None;
         Ok(())
     }
 
     /// Return path /dev/... under which the nexus is shared or None if not
-    /// shared.
+    /// shared as nbd.
     pub fn get_share_path(&self) -> Option<String> {
-        match self.nbd_disk {
-            Some(ref disk) => Some(disk.get_path()),
-            None => None,
+        match self.nexus_target {
+            Some(NexusTarget::NbdDisk( ref disk )) => Some(disk.get_path()),
+            _ => None,
         }
     }
 }
