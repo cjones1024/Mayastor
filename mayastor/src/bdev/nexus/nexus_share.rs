@@ -42,11 +42,6 @@ impl Nexus {
             });
         }
 
-        assert_eq!(self.share_handle, None);
-
-
-        // TODO for now we discard and ignore share_proto
-
         let name = if let Some(key) = key {
             let name = format!("crypto-{}", self.name);
 
@@ -78,8 +73,8 @@ impl Nexus {
         // The share handle is the actual bdev that is shared through the
         // various protocols.
 
-        let return_val = match share_protocol {
-            ShareProtocol::Nbd => {
+        let device_id = match share_protocol {
+            ShareProtocolNexus::NbdFe => {
                 // Publish the nexus to system using nbd device and return the path to
                 // nbd device.
                 let nbd_disk =
@@ -88,7 +83,7 @@ impl Nexus {
                     })?;
                 let device_path = nbd_disk.get_path();
                 self.nbd_disk = Some(nbd_disk);
-                Ok(device_path)
+                device_path
             },
             ShareProtocol::Iscsi => {
                 // Publish the nexus to system using an iscsi target and return the IQN
@@ -98,7 +93,7 @@ impl Nexus {
                     })?;
                 let iqn = iscsi_target.get_iqn();
                 self.iscsi_target = Some(iscsi_target);
-                Ok(iqn)
+                iqn
             },
             ShareProtocol::Nvmf => {
                 return Err(Error::InvalidShareProtocol {sp_value: share_protocol as i32})
@@ -106,8 +101,8 @@ impl Nexus {
             _ => return Err(Error::InvalidShareProtocol {sp_value: share_protocol as i32}),
         };
         self.share_handle = Some(name);
-        self.share_protocol = share_protocol;
-        return_val
+        self.share_protocol = Some(share_protocol);
+        Ok(device_id)
     }
 
     /// Undo share operation on nexus. To the chain of bdevs are all claimed
