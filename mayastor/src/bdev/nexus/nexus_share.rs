@@ -74,7 +74,7 @@ impl Nexus {
         // various protocols.
 
         let device_id = match share_protocol {
-            ShareProtocolNexus::NbdFe => {
+            ShareProtocolNexus::NexusNbd => {
                 // Publish the nexus to system using nbd device and return the path to
                 // nbd device.
                 let nbd_disk =
@@ -85,7 +85,7 @@ impl Nexus {
                 self.nbd_disk = Some(nbd_disk);
                 device_path
             },
-            ShareProtocol::Iscsi => {
+            ShareProtocolNexus::NexusIscsi => {
                 // Publish the nexus to system using an iscsi target and return the IQN
                 let iscsi_target =
                     NexusIscsiTarget::create(&name).context(ShareIscsiNexus {
@@ -95,7 +95,7 @@ impl Nexus {
                 self.iscsi_target = Some(iscsi_target);
                 iqn
             },
-            ShareProtocol::Nvmf => {
+            ShareProtocolNexus::NexusNvmf => {
                 return Err(Error::InvalidShareProtocol {sp_value: share_protocol as i32})
             },
             _ => return Err(Error::InvalidShareProtocol {sp_value: share_protocol as i32}),
@@ -111,7 +111,7 @@ impl Nexus {
     /// from there.
     pub async fn unshare(&mut self) -> Result<(), Error> {
         match self.share_protocol {
-            ShareProtocol::Nbd =>  {
+            Some(ShareProtocolNexus::NexusNbd) =>  {
                 match self.nbd_disk.take() {
                     Some(disk) => {
                         disk.destroy();
@@ -121,7 +121,7 @@ impl Nexus {
                     }),
                 }
             },
-            ShareProtocol::Iscsi => {
+            Some(ShareProtocolNexus::NexusIscsi) => {
                 match self.iscsi_target.take() {
                     Some(iscsi_target) => {
                         iscsi_target.destroy().await;
@@ -131,8 +131,8 @@ impl Nexus {
                     }),
                 }
             },
-            ShareProtocol::Nvmf => {
-                return Err(Error::InvalidShareProtocol {sp_value: self.share_protocol as i32})
+            Some(ShareProtocolNexus::NexusNvmf) => {
+                return Err(Error::InvalidShareProtocol {sp_value: self.share_protocol.unwrap() as i32})
             },
             _ => return Err(Error::InvalidShareProtocol {sp_value: self.share_protocol as i32}),
         };
