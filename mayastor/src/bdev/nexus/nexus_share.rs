@@ -114,9 +114,11 @@ impl Nexus {
                     NexusIscsiTarget::create(&name).context(ShareIscsiNexus {
                         name: self.name.clone(),
                     })?;
-                let iqn = iscsi_target.get_iqn();
+                let uri = iscsi_target.get_uri().context(ShareIscsiNexus {
+                    name: self.name.clone(),
+                })?;
                 self.nexus_target = Some(NexusTarget::NexusIscsiTarget( iscsi_target ));
-                iqn
+                uri
             },
             ShareProtocolNexus::NexusNvmf => {
                 return Err(Error::InvalidShareProtocol {sp_value: share_protocol as i32})

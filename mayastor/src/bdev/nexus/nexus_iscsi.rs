@@ -8,7 +8,7 @@ use snafu::{Snafu};
 
 use crate::{
     core::{Bdev, Side},
-    target::iscsi::{share, target_name, unshare}
+    target::iscsi::{get_uri, share, target_name, unshare}
 };
 
 #[derive(Debug, Snafu)]
@@ -52,6 +52,13 @@ impl NexusIscsiTarget {
 
     pub fn get_iqn(&self) -> String {
         target_name(&self.bdev_name)
+    }
+
+    pub fn get_uri(&self) -> Result<String, NexusIscsiError>{
+        match get_uri(&self.bdev_name, Side::Nexus) {
+            None => Err(NexusIscsiError::BdevNotFound{ dev: self.bdev_name.to_string() }),
+            Some(uri) => Ok(uri),
+        }
     }
 }
 

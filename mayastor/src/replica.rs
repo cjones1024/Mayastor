@@ -161,7 +161,7 @@ fn detect_share(uuid: &str) -> Option<(ShareType, String)> {
     // first try nvmf and then try iscsi
     match target::nvmf::get_uri(uuid) {
         Some(uri) => Some((ShareType::Nvmf, uri)),
-        None => match target::iscsi::get_uri(uuid) {
+        None => match target::iscsi::get_uri(uuid, Side::Replica) {
             Some(uri) => Some((ShareType::Iscsi, uri)),
             None => None,
         },
