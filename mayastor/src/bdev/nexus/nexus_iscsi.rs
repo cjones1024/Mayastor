@@ -8,7 +8,7 @@ use snafu::{Snafu};
 
 use crate::{
     core::{Bdev, Side},
-    target::iscsi::{get_uri, share, target_name, unshare}
+    target::iscsi::{create_uri, share, target_name, unshare}
 };
 
 #[derive(Debug, Snafu)]
@@ -50,26 +50,23 @@ impl NexusIscsiTarget {
         }
     }
 
-    pub fn get_iqn(&self) -> String {
+    fn get_iqn(&self) -> String {
         target_name(&self.bdev_name)
     }
 
-    pub fn get_uri(&self) -> Result<String, NexusIscsiError>{
-        match get_uri(&self.bdev_name, Side::Nexus) {
-            None => Err(NexusIscsiError::BdevNotFound{ dev: self.bdev_name.to_string() }),
-            Some(uri) => Ok(uri),
-        }
+    pub fn get_uri(&self) ->String {
+        create_uri(Side::Nexus, &self.get_iqn())
     }
 }
 
 impl fmt::Debug for NexusIscsiTarget {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}@{:?}", self.get_iqn(), self.bdev_name)
+        write!(f, "{}@{:?}", self.get_uri(), self.bdev_name)
     }
 }
 
 impl fmt::Display for NexusIscsiTarget {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.get_iqn())
+        write!(f, "{}", self.get_uri())
     }
 }

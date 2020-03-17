@@ -270,8 +270,8 @@ fn destroy_portal_group(pg_idx: c_int) {
     }
 }
 
-/// Return iscsi backend target URI understood by nexus
-pub fn get_uri(bdev_name: &str, side: Side) -> Option<String> {
+/// Return iscsi target URI understood by nexus
+pub fn get_uri(side: Side, bdev_name: &str) -> Option<String> {
     let iqn = target_name(bdev_name);
     let c_iqn = CString::new(iqn.clone()).unwrap();
     let tgt = unsafe { spdk_iscsi_find_tgt_node(c_iqn.as_ptr()) };
@@ -279,14 +279,17 @@ pub fn get_uri(bdev_name: &str, side: Side) -> Option<String> {
     if tgt.is_null() {
         return None;
     }
+    Some(create_uri(side, &iqn))
+}
+
+pub fn create_uri(side: Side, iqn: &str) -> String {
     let port = match side {
         Side::Nexus => ISCSI_PORT_NEXUS,
         Side::Replica => ISCSI_PORT_REPLICA,
     };
-
     ADDRESS.with(move |a| {
         let a_borrow = a.borrow();
         let address = a_borrow.as_ref().unwrap();
-        Some(format!("iscsi://{}:{}/{}", address, port, iqn))
+        format!("iscsi://{}:{}/{}", address, port, iqn)
     })
 }
