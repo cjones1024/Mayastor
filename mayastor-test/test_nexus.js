@@ -363,6 +363,77 @@ describe('nexus', function() {
       });
   });
 */
+
+  it('should publish the nexus using nbd', done => {
+    // TODO: repeat this test for Nvmf
+    client.PublishNexus(
+      {
+        uuid: UUID,
+        share: mayastorProtoConstants.ShareProtocolNexus.NEXUS_NBD,
+      },
+      (err, res) => {
+        assert(res.device_path);
+        nbd_device = res.device_path;
+        done();
+      }
+    );
+  });
+
+  it('should un-publish the nexus device', done => {
+    // TODO: repeat this test for Nvmf
+    client.unpublishNexus({ uuid: UUID }, (err, res) => {
+      if (err) done(err);
+      done();
+    });
+  });
+
+  it('should re-publish the nexus using NBD, and a crypto key', done => {
+    // TODO: repeat this test for Nvmf
+    client.PublishNexus(
+      {
+        uuid: UUID,
+        share: mayastorProtoConstants.ShareProtocolNexus.NEXUS_NBD,
+        key: '0123456789123456',
+      },
+      (err, res) => {
+        assert(res.device_path);
+        nbd_device = res.device_path;
+        done();
+      }
+    );
+  });
+
+  it('should be able to write to the NBD device', async () => {
+    // TODO: repeat this test for Nvmf
+    const fs = require('fs').promises;
+    let fd = await fs.open(nbd_device, 'w', 666);
+    let buffer = Buffer.alloc(512, 'z', 'utf8');
+    await fd.write(buffer, 0, 512);
+    await fd.sync();
+    await fd.close();
+  });
+
+  it('should be able to read the written data back', async () => {
+    // TODO: repeat this test for Nvmf
+    const fs = require('fs').promises;
+    let fd = await fs.open(nbd_device, 'r', 666);
+    let buffer = Buffer.alloc(512, 'a', 'utf8');
+    await fd.read(buffer, 0, 512);
+    await fd.close();
+
+    buffer.forEach(e => {
+      assert(e === 122);
+    });
+  });
+
+  it('should un-publish the NBD nexus device', done => {
+    // TODO: repeat this test for Nvmf
+    client.unpublishNexus({ uuid: UUID }, (err, res) => {
+      if (err) done(err);
+      done();
+    });
+  });
+
   it('should publish the nexus using iscsi', done => {
     client.PublishNexus({ uuid: UUID, share: mayastorProtoConstants.ShareProtocolNexus.NEXUS_ISCSI }, (err, res) => {
       assert(res.device_path);
@@ -379,7 +450,7 @@ describe('nexus', function() {
 
   it('should re-publish the nexus using iSCSI and a crypto-key', done => {
     client.PublishNexus({
-      uuid: UUID, 
+      uuid: UUID,
       share: mayastorProtoConstants.ShareProtocolNexus.NEXUS_ISCSI,
       key: '0123456789123456',
     }, (err, res) => {
@@ -398,72 +469,6 @@ describe('nexus', function() {
       } else {
         done();
       }
-    });
-  });
-
-  it('should un-publish the iscsi nexus device', done => {
-    client.unpublishNexus({ uuid: UUID }, (err, res) => {
-      if (err) done(err);
-      done();
-    });
-  });
-
-  it('should publish the nexus using nbd', done => {
-    // TODO: repeat this test for iSCSI and Nvmf
-    client.PublishNexus(
-      {
-        uuid: UUID,
-        share: mayastorProtoConstants.ShareProtocolNexus.NEXUS_NBD,
-      },
-      (err, res) => {
-        assert(res.device_path);
-        nbd_device = res.device_path;
-        done();
-      }
-    );
-  });
-
-  it('should un-publish the nexus device', done => {
-    client.unpublishNexus({ uuid: UUID }, (err, res) => {
-      if (err) done(err);
-      done();
-    });
-  });
-
-  it('should re-publish the nexus using NBD, and a crypto key', done => {
-    // TODO: repeat this test for iSCSI and Nvmf
-    client.PublishNexus(
-      {
-        uuid: UUID,
-        share: mayastorProtoConstants.ShareProtocolNexus.NEXUS_NBD,
-        key: '0123456789123456',
-      },
-      (err, res) => {
-        assert(res.device_path);
-        nbd_device = res.device_path;
-        done();
-      }
-    );
-  });
-
-  it('should be able to write to the NBD device', async () => {
-    const fs = require('fs').promises;
-    let fd = await fs.open(nbd_device, 'w', 666);
-    let buffer = Buffer.alloc(512, 'z', 'utf8');
-    await fd.write(buffer, 0, 512);
-    await fd.sync();
-    await fd.close();
-  });
-
-  it('should be able to read the written data back', async () => {
-    const fs = require('fs').promises;
-    let fd = await fs.open(nbd_device, 'r', 666);
-    let buffer = Buffer.alloc(512, 'a', 'utf8');
-    await fd.read(buffer, 0, 512);
-    await fd.close();
-
-    buffer.forEach(e => {
-      assert(e === 122);
     });
   });
 
@@ -520,13 +525,25 @@ describe('nexus', function() {
     });
   });
 
-  it('should create, publish, un-publish and finally destroy the same nexus', async () => {
+  it('should create, publish, un-publish and finally destroy the same NBD nexus', async () => {
     for (let i = 0; i < 10; i++) {
       await createNexus(createArgs);
-      // TODO: repeat this test for iSCSI and Nvmf
+      // TODO: repeat this test for Nvmf
       await publish({
         uuid: UUID,
         share: mayastorProtoConstants.ShareProtocolNexus.NEXUS_NBD,
+      });
+      await unpublish({ uuid: UUID });
+      await destroyNexus({ uuid: UUID });
+    }
+  });
+
+  it('should create, publish, un-publish and finally destroy the same iSCSI nexus', async () => {
+    for (let i = 0; i < 10; i++) {
+      await createNexus(createArgs);
+      await publish({
+        uuid: UUID,
+        share: mayastorProtoConstants.ShareProtocolNexus.NEXUS_ISCSI,
       });
       await unpublish({ uuid: UUID });
       await destroyNexus({ uuid: UUID });
@@ -541,13 +558,24 @@ describe('nexus', function() {
     });
   });
 
-  it('should create, publish, and destroy but without un-publishing the same nexus', async () => {
+  it('should create, publish, and destroy but without un-publishing the same nexus, with NBD protocol', async () => {
     for (let i = 0; i < 10; i++) {
       await createNexus(createArgs);
-      // TODO: repeat this test for iSCSI and Nvmf
+      // TODO: repeat this test for Nvmf
       await publish({
         uuid: UUID,
         share: mayastorProtoConstants.ShareProtocolNexus.NEXUS_NBD,
+      });
+      await destroyNexus({ uuid: UUID });
+    }
+  });
+
+  it('should create, publish, and destroy but without un-publishing the same nexus, with iSCSI protocol', async () => {
+    for (let i = 0; i < 10; i++) {
+      await createNexus(createArgs);
+      await publish({
+        uuid: UUID,
+        share: mayastorProtoConstants.ShareProtocolNexus.NEXUS_ISCSI,
       });
       await destroyNexus({ uuid: UUID });
     }

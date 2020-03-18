@@ -98,7 +98,7 @@ pub fn target_name(bdev_name: &str) -> String {
 pub fn init(address: &str) -> Result<()> {
 
     create_portal_group(address, ISCSI_PORT_REPLICA, ISCSI_PORTAL_GROUP_REPLICA)?;
-    
+
     if let Err(e) = create_portal_group(address, ISCSI_PORT_NEXUS, ISCSI_PORTAL_GROUP_NEXUS) {
         destroy_portal_group(ISCSI_PORTAL_GROUP_REPLICA);
         return Err(e);
