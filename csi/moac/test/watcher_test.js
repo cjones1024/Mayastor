@@ -96,7 +96,7 @@ class GetMock {
 }
 
 // A mock representing k8s watch stream.
-// You can feed arbitrary strings to it and it will pass them to a consumer.
+// You can feed arbitrary objects to it and it will pass them to a consumer.
 // Example of k8s watch stream event follows:
 //
 // {
@@ -105,9 +105,6 @@ class GetMock {
 //     ... (object as shown in GetMock example above)
 //  }
 //}
-//
-// NOTE: The event objects must be each on its own line. That's how k8s does
-// it. Event parser breaks otherwise!
 class StreamMock extends Readable {
   constructor() {
     super({ autoDestroy: true, objectMode: true });
@@ -463,38 +460,4 @@ module.exports = function() {
     watcher.stop();
     streamMockTracker.latest().end();
   }).timeout(10000);
-
-  it('should not crash upon invalid json in the stream', done => {
-    var getMock = new GetMock();
-    var streamMockTracker = new StreamMockTracker();
-    var watcher = new Watcher('test', getMock, streamMockTracker, objectFilter);
-    var newCount = 0;
-    var modCount = 0;
-
-    watcher.on('new', () => newCount++);
-    watcher.on('mod', () => modCount++);
-    getMock.add(createObject('object', 1, 155));
-
-    watcher.start().then(() => {
-      expect(newCount).to.equal(1);
-      expect(modCount).to.equal(0);
-
-      // Following line should be ignored
-      streamMockTracker
-        .latest()
-        .feedRaw('{"type": "ADD", "object":{"non-sense\n');
-      streamMockTracker
-        .latest()
-        .feed('MODIFIED', createObject('object', 2, 156));
-
-      watcher.once('sync', () => {
-        watcher.stop();
-        streamMockTracker.latest().end();
-        expect(newCount).to.equal(1);
-        expect(modCount).to.equal(1);
-        done();
-      });
-      streamMockTracker.latest().end();
-    });
-  });
 };

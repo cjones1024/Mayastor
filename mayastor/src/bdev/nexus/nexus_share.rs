@@ -121,7 +121,6 @@ impl Nexus {
             ShareProtocolNexus::NexusNvmf => {
                 return Err(Error::InvalidShareProtocol {sp_value: share_protocol as i32})
             },
-            _ => return Err(Error::InvalidShareProtocol {sp_value: share_protocol as i32}),
         };
         self.share_handle = Some(name);
         Ok(device_id)

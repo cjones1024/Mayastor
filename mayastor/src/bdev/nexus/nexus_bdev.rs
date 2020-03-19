@@ -52,10 +52,6 @@ use crate::{
     rebuild::{RebuildError, RebuildTask},
 };
 
-use rpc::mayastor::{
-    ShareProtocol,
-};
-
 /// Common errors for nexus basic operations and child operations
 /// which are part of nexus object.
 #[derive(Debug, Snafu)]
@@ -193,6 +189,9 @@ impl RpcErrorCode for Error {
             Error::ChildNotFound {
                 ..
             } => Code::NotFound,
+            Error::InvalidShareProtocol {
+                ..
+            } => Code::InvalidParams,
             _ => Code::InternalError,
         }
     }

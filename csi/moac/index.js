@@ -5,7 +5,8 @@
 
 'use strict';
 
-const { config, Client } = require('kubernetes-client');
+const { Client, KubeConfig } = require('kubernetes-client');
+const Request = require('kubernetes-client/backends/request');
 const yargs = require('yargs');
 const logger = require('./logger');
 const Registry = require('./registry');
@@ -124,8 +125,7 @@ async function main() {
 
   if (!opts.s) {
     // Create k8s client and load openAPI spec from k8s api server
-    let k8sConfig = readK8sConfig(opts.kubeconfig);
-    let client = new Client({ config: k8sConfig });
+    let client = createK8sClient(opts.kubeconfig);
     log.debug('Loading openAPI spec from the server');
     await client.loadSpec();
 
