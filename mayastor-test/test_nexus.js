@@ -448,6 +448,44 @@ describe('nexus', function() {
     });
   });
 
+  it('should publish the nexus using iscsi', done => {
+    client.PublishNexus({ uuid: UUID, share: mayastorProtoConstants.ShareProtocolNexus.NEXUS_ISCSI }, (err, res) => {
+      assert(res.device_path);
+      done();
+    });
+  });
+
+  it('should fail another publish request using a different protocol', done => {
+    client.PublishNexus({ uuid: UUID, share: mayastorProtoConstants.ShareProtocolNexus.NEXUS_NBD }, (err, res) => {
+      if (!err) return done(new Error('Expected error'));
+      assert.equal(err.code, grpc.status.INVALID_ARGUMENT);
+      done();
+    });
+  });
+
+  it('should succeed another publish request using the existing protocol', done => {
+    client.PublishNexus({ uuid: UUID, share: mayastorProtoConstants.ShareProtocolNexus.NEXUS_ISCSI }, (err, res) => {
+      if (err) done(err);
+      assert(res.device_path);
+      done();
+    });
+  });
+
+  it('should un-publish the iscsi nexus device', done => {
+    client.unpublishNexus({ uuid: UUID }, (err, res) => {
+      if (err) done(err);
+      done();
+    });
+  });
+
+  it('should succeed another un-publish request', done => {
+    client.unpublishNexus({ uuid: UUID }, (err, res) => {
+      if (err) done(err);
+      done();
+    });
+  });
+
+
   it('should re-publish the nexus using iSCSI and a crypto-key', done => {
     client.PublishNexus({
       uuid: UUID,

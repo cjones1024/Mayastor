@@ -38,8 +38,6 @@ impl Nexus {
         key: Option<String>,
     ) -> Result<String, Error> {
 
-        assert_eq!(self.share_handle, None);
-
         // We could already be shared -- as CSI is idempotent chances are we get called for some odd reason.
         // Validate indeed -- that we are shared by walking the target.
         // If so, and the protocol is correct simply return Ok().
@@ -64,6 +62,8 @@ impl Nexus {
             },
             None => (),
         }
+
+        assert_eq!(self.share_handle, None);
 
         let name = if let Some(key) = key {
             let name = format!("crypto-{}", self.name);
