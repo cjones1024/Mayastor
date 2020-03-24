@@ -6,8 +6,10 @@ use snafu::Snafu;
 
 use crate::{
     core::Bdev,
-    target::iscsi::{create_uri, share, target_name, unshare},
-    target::Side,
+    target::{
+        iscsi::{create_uri, share, target_name, unshare},
+        Side,
+    },
 };
 
 #[derive(Debug, Snafu)]
@@ -24,7 +26,7 @@ pub enum NexusIscsiError {
 
 /// Iscsi target representation.
 pub struct NexusIscsiTarget {
-    bdev_name: String, // logically we might store a spdk_iscsi_tgt_node here but ATM the bdev name is all we actually need
+    bdev_name: String, /* logically we might store a spdk_iscsi_tgt_node here but ATM the bdev name is all we actually need */
 }
 
 impl NexusIscsiTarget {
