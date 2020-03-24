@@ -63,10 +63,14 @@ impl RebuildTask {
         end: u64,
         complete_fn: fn(String, String) -> (),
     ) -> Result<RebuildTask, RebuildError> {
-        let source_hdl = BdevHandle::open(&source, false, false)
-            .context(NoBdevHandle { bdev: &source })?;
+        let source_hdl =
+            BdevHandle::open(&source, false, false).context(NoBdevHandle {
+                bdev: &source,
+            })?;
         let destination_hdl = BdevHandle::open(&destination, true, false)
-            .context(NoBdevHandle { bdev: &destination })?;
+            .context(NoBdevHandle {
+                bdev: &destination,
+            })?;
 
         if !RebuildTask::validate(
             &source_hdl.get_bdev(),
@@ -142,7 +146,9 @@ impl RebuildTask {
         self.source_hdl
             .read_at(self.current * self.block_size, &mut self.copy_buffer)
             .await
-            .context(IoError { bdev: &self.source })?;
+            .context(IoError {
+                bdev: &self.source,
+            })?;
 
         self.destination_hdl
             .write_at(self.current * self.block_size, &self.copy_buffer)
