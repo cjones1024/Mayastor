@@ -17,13 +17,19 @@ use nix::errno::Errno;
 use snafu::{ResultExt, Snafu};
 
 use spdk_sys::{
-    spdk_bdev_get_name, spdk_iscsi_find_tgt_node,
+    spdk_bdev_get_name,
+    spdk_iscsi_find_tgt_node,
     spdk_iscsi_init_grp_create_from_initiator_list,
-    spdk_iscsi_init_grp_destroy, spdk_iscsi_init_grp_unregister,
-    spdk_iscsi_portal_create, spdk_iscsi_portal_grp_add_portal,
-    spdk_iscsi_portal_grp_create, spdk_iscsi_portal_grp_open,
-    spdk_iscsi_portal_grp_register, spdk_iscsi_portal_grp_release,
-    spdk_iscsi_portal_grp_unregister, spdk_iscsi_shutdown_tgt_node_by_name,
+    spdk_iscsi_init_grp_destroy,
+    spdk_iscsi_init_grp_unregister,
+    spdk_iscsi_portal_create,
+    spdk_iscsi_portal_grp_add_portal,
+    spdk_iscsi_portal_grp_create,
+    spdk_iscsi_portal_grp_open,
+    spdk_iscsi_portal_grp_register,
+    spdk_iscsi_portal_grp_release,
+    spdk_iscsi_portal_grp_unregister,
+    spdk_iscsi_shutdown_tgt_node_by_name,
     spdk_iscsi_tgt_node_construct,
 };
 
@@ -150,17 +156,21 @@ fn share_as_iscsi_target(
             ptr::null(),                            // alias
             &mut pg_idx as *mut _,                  // pg_tag_list
             &mut ig_idx as *mut _,                  // ig_tag_list
-            1, // portal and initiator group list length
-            &mut spdk_bdev_get_name(bdev.as_ptr()), // bdev name, how iscsi target gets associated with a bdev
-            &mut lun_id as *mut _,                  // lun id
-            1,                                      // length of lun id list
-            128,                                    // max queue depth
-            false,                                  // disable chap
-            false,                                  // require chap
-            false,                                  // mutual chap
-            0,                                      // chap group
-            false,                                  // header digest
-            false,                                  // data digest
+            1,                                      /* portal and initiator
+                                                     * group list length */
+            &mut spdk_bdev_get_name(bdev.as_ptr()), /* bdev name, how iscsi
+                                                     * target gets
+                                                     * associated with a
+                                                     * bdev */
+            &mut lun_id as *mut _, // lun id
+            1,                     // length of lun id list
+            128,                   // max queue depth
+            false,                 // disable chap
+            false,                 // require chap
+            false,                 // mutual chap
+            0,                     // chap group
+            false,                 // header digest
+            false,                 // data digest
         )
     };
     if tgt.is_null() {

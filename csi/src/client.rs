@@ -73,7 +73,9 @@ async fn destroy_pool(
     }
 
     client
-        .destroy_pool(Request::new(rpc::mayastor::DestroyPoolRequest { name }))
+        .destroy_pool(Request::new(rpc::mayastor::DestroyPoolRequest {
+            name,
+        }))
         .await?;
 
     Ok(())

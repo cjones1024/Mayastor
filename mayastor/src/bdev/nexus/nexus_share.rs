@@ -8,8 +8,13 @@ use spdk_sys::create_crypto_disk;
 use crate::{
     bdev::nexus::{
         nexus_bdev::{
-            CreateCryptoBdev, DestroyCryptoBdev, Error, Nexus, NexusTarget,
-            ShareIscsiNexus, ShareNbdNexus,
+            CreateCryptoBdev,
+            DestroyCryptoBdev,
+            Error,
+            Nexus,
+            NexusTarget,
+            ShareIscsiNexus,
+            ShareNbdNexus,
         },
         nexus_iscsi::NexusIscsiTarget,
         nexus_nbd::NbdDisk,
@@ -30,11 +35,12 @@ impl Nexus {
         share_protocol: ShareProtocolNexus,
         key: Option<String>,
     ) -> Result<String, Error> {
-        // We could already be shared -- as CSI is idempotent chances are we get called for some odd reason.
-        // Validate indeed -- that we are shared by walking the target.
-        // If so, and the protocol is correct simply return Ok().
-        // If so, and the protocol is incorrect, return Error().
-        // If we are not shared but the variant says we should be, carry on to correct the state.
+        // We could already be shared -- as CSI is idempotent chances are we get
+        // called for some odd reason. Validate indeed -- that we are
+        // shared by walking the target. If so, and the protocol is
+        // correct simply return Ok(). If so, and the protocol is
+        // incorrect, return Error(). If we are not shared but the
+        // variant says we should be, carry on to correct the state.
         match self.nexus_target {
             Some(NexusTarget::NbdDisk(ref nbd_disk)) => {
                 if share_protocol != ShareProtocolNexus::NexusNbd {
@@ -94,8 +100,8 @@ impl Nexus {
 
         let device_id = match share_protocol {
             ShareProtocolNexus::NexusNbd => {
-                // Publish the nexus to system using nbd device and return the path to
-                // nbd device.
+                // Publish the nexus to system using nbd device and return the
+                // path to nbd device.
                 let nbd_disk =
                     NbdDisk::create(&name).await.context(ShareNbdNexus {
                         name: self.name.clone(),
@@ -105,7 +111,8 @@ impl Nexus {
                 device_path
             }
             ShareProtocolNexus::NexusIscsi => {
-                // Publish the nexus to system using an iscsi target and return the IQN
+                // Publish the nexus to system using an iscsi target and return
+                // the IQN
                 let iscsi_target = NexusIscsiTarget::create(&name).context(
                     ShareIscsiNexus {
                         name: self.name.clone(),
