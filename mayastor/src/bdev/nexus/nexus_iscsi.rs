@@ -5,8 +5,9 @@ use std::fmt;
 use snafu::Snafu;
 
 use crate::{
-    core::{Bdev, Side},
+    core::Bdev,
     target::iscsi::{create_uri, share, target_name, unshare},
+    target::Side,
 };
 
 #[derive(Debug, Snafu)]
@@ -60,23 +61,19 @@ impl NexusIscsiTarget {
         }
     }
 
-    fn get_iqn(&self) -> String {
-        target_name(&self.bdev_name)
-    }
-
-    pub fn get_uri(&self) -> String {
-        create_uri(Side::Nexus, &self.get_iqn())
+    pub fn as_uri(&self) -> String {
+        create_uri(Side::Nexus, &target_name(&self.bdev_name))
     }
 }
 
 impl fmt::Debug for NexusIscsiTarget {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}@{:?}", self.get_uri(), self.bdev_name)
+        write!(f, "{}@{:?}", self.as_uri(), self.bdev_name)
     }
 }
 
 impl fmt::Display for NexusIscsiTarget {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.get_uri())
+        write!(f, "{}", self.as_uri())
     }
 }

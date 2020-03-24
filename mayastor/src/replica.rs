@@ -25,7 +25,7 @@ use spdk_sys::{
 };
 
 use crate::{
-    core::{Bdev, Side},
+    core::Bdev,
     ffihelper::{cb_arg, done_errno_cb, errno_result_from_i32, ErrnoResult},
     jsonrpc::{jsonrpc_register, Code, RpcErrorCode},
     pool::Pool,
@@ -124,7 +124,7 @@ fn detect_share(uuid: &str) -> Option<(ShareType, String)> {
     // first try nvmf and then try iscsi
     match target::nvmf::get_uri(uuid) {
         Some(uri) => Some((ShareType::Nvmf, uri)),
-        None => match target::iscsi::get_uri(Side::Replica, uuid) {
+        None => match target::iscsi::get_uri(target::Side::Replica, uuid) {
             Some(uri) => Some((ShareType::Iscsi, uri)),
             None => None,
         },
@@ -245,7 +245,7 @@ impl Replica {
                 .await
                 .context(ShareNvmf {})?,
             ShareType::Iscsi => {
-                target::iscsi::share(&uuid, &bdev, Side::Replica)
+                target::iscsi::share(&uuid, &bdev, target::Side::Replica)
                     .context(ShareIscsi {})?
             }
         }

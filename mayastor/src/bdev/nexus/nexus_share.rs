@@ -53,7 +53,7 @@ impl Nexus {
                     });
                 } else {
                     warn!("{} is already shared", self.name);
-                    return Ok(iscsi_target.get_uri());
+                    return Ok(iscsi_target.as_uri());
                 }
             }
             None => (),
@@ -111,7 +111,7 @@ impl Nexus {
                         name: self.name.clone(),
                     },
                 )?;
-                let uri = iscsi_target.get_uri();
+                let uri = iscsi_target.as_uri();
                 self.nexus_target =
                     Some(NexusTarget::NexusIscsiTarget(iscsi_target));
                 uri

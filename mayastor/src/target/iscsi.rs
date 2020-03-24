@@ -28,9 +28,10 @@ use spdk_sys::{
 };
 
 use crate::{
-    core::{Bdev, Side},
+    core::Bdev,
     ffihelper::{cb_arg, done_errno_cb, ErrnoResult},
     jsonrpc::{Code, RpcErrorCode},
+    target::Side,
 };
 
 /// iSCSI target related errors
