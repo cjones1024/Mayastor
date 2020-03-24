@@ -17,19 +17,13 @@ use nix::errno::Errno;
 use snafu::{ResultExt, Snafu};
 
 use spdk_sys::{
-    spdk_bdev_get_name,
-    spdk_iscsi_find_tgt_node,
+    spdk_bdev_get_name, spdk_iscsi_find_tgt_node,
     spdk_iscsi_init_grp_create_from_initiator_list,
-    spdk_iscsi_init_grp_destroy,
-    spdk_iscsi_init_grp_unregister,
-    spdk_iscsi_portal_create,
-    spdk_iscsi_portal_grp_add_portal,
-    spdk_iscsi_portal_grp_create,
-    spdk_iscsi_portal_grp_open,
-    spdk_iscsi_portal_grp_register,
-    spdk_iscsi_portal_grp_release,
-    spdk_iscsi_portal_grp_unregister,
-    spdk_iscsi_shutdown_tgt_node_by_name,
+    spdk_iscsi_init_grp_destroy, spdk_iscsi_init_grp_unregister,
+    spdk_iscsi_portal_create, spdk_iscsi_portal_grp_add_portal,
+    spdk_iscsi_portal_grp_create, spdk_iscsi_portal_grp_open,
+    spdk_iscsi_portal_grp_register, spdk_iscsi_portal_grp_release,
+    spdk_iscsi_portal_grp_unregister, spdk_iscsi_shutdown_tgt_node_by_name,
     spdk_iscsi_tgt_node_construct,
 };
 
@@ -96,10 +90,15 @@ pub fn target_name(bdev_name: &str) -> String {
 /// Create iscsi portal and initiator group which will be used later when
 /// creating iscsi targets.
 pub fn init(address: &str) -> Result<()> {
+    create_portal_group(
+        address,
+        ISCSI_PORT_REPLICA,
+        ISCSI_PORTAL_GROUP_REPLICA,
+    )?;
 
-    create_portal_group(address, ISCSI_PORT_REPLICA, ISCSI_PORTAL_GROUP_REPLICA)?;
-
-    if let Err(e) = create_portal_group(address, ISCSI_PORT_NEXUS, ISCSI_PORTAL_GROUP_NEXUS) {
+    if let Err(e) =
+        create_portal_group(address, ISCSI_PORT_NEXUS, ISCSI_PORTAL_GROUP_NEXUS)
+    {
         destroy_portal_group(ISCSI_PORTAL_GROUP_REPLICA);
         return Err(e);
     }
@@ -127,8 +126,12 @@ pub fn fini() {
     destroy_iscsi_groups();
 }
 
-fn share_as_iscsi_target(bdev_name: &str, bdev: &Bdev, mut pg_idx: c_int, mut ig_idx: c_int ) -> Result<String ,Error>{
-
+fn share_as_iscsi_target(
+    bdev_name: &str,
+    bdev: &Bdev,
+    mut pg_idx: c_int,
+    mut ig_idx: c_int,
+) -> Result<String, Error> {
     let iqn = target_name(bdev_name);
     let c_iqn = CString::new(iqn.clone()).unwrap();
 
@@ -141,22 +144,22 @@ fn share_as_iscsi_target(bdev_name: &str, bdev: &Bdev, mut pg_idx: c_int, mut ig
 
     let tgt = unsafe {
         spdk_iscsi_tgt_node_construct(
-            idx,                             // target_index
-            c_iqn.as_ptr(),                  // name
-            ptr::null(),                     // alias
-            &mut pg_idx as *mut _,           // pg_tag_list
-            &mut ig_idx as *mut _,           // ig_tag_list
-            1,                                       // portal and initiator group list length
-            &mut spdk_bdev_get_name(bdev.as_ptr()),  // bdev name, how iscsi target gets associated with a bdev
-            &mut lun_id as *mut _,           // lun id
-            1,     // length of lun id list
-            128,   // max queue depth
-            false, // disable chap
-            false, // require chap
-            false, // mutual chap
-            0,     // chap group
-            false, // header digest
-            false, // data digest
+            idx,                                    // target_index
+            c_iqn.as_ptr(),                         // name
+            ptr::null(),                            // alias
+            &mut pg_idx as *mut _,                  // pg_tag_list
+            &mut ig_idx as *mut _,                  // ig_tag_list
+            1, // portal and initiator group list length
+            &mut spdk_bdev_get_name(bdev.as_ptr()), // bdev name, how iscsi target gets associated with a bdev
+            &mut lun_id as *mut _,                  // lun id
+            1,                                      // length of lun id list
+            128,                                    // max queue depth
+            false,                                  // disable chap
+            false,                                  // require chap
+            false,                                  // mutual chap
+            0,                                      // chap group
+            false,                                  // header digest
+            false,                                  // data digest
         )
     };
     if tgt.is_null() {
@@ -170,12 +173,21 @@ fn share_as_iscsi_target(bdev_name: &str, bdev: &Bdev, mut pg_idx: c_int, mut ig
 /// Export given bdev over iscsi. That involves creating iscsi target and
 /// adding the bdev as LUN to it.
 pub fn share(bdev_name: &str, bdev: &Bdev, side: Side) -> Result<()> {
-
     let iqn = match side {
-        Side::Nexus => share_as_iscsi_target(bdev_name, bdev, ISCSI_PORTAL_GROUP_NEXUS, ISCSI_INITIATOR_GROUP)?,
-        Side::Replica => share_as_iscsi_target(bdev_name, bdev, ISCSI_PORTAL_GROUP_REPLICA, ISCSI_INITIATOR_GROUP)?,
+        Side::Nexus => share_as_iscsi_target(
+            bdev_name,
+            bdev,
+            ISCSI_PORTAL_GROUP_NEXUS,
+            ISCSI_INITIATOR_GROUP,
+        )?,
+        Side::Replica => share_as_iscsi_target(
+            bdev_name,
+            bdev,
+            ISCSI_PORTAL_GROUP_REPLICA,
+            ISCSI_INITIATOR_GROUP,
+        )?,
     };
-    info!("Created iscsi target {} for {}", iqn, bdev_name );
+    info!("Created iscsi target {} for {}", iqn, bdev_name);
     Ok(())
 }
 
@@ -231,7 +243,11 @@ fn destroy_initiator_group(ig_idx: c_int) {
     }
 }
 
-fn create_portal_group(address: &str, port_no: u16, pg_no: c_int) -> Result<()> {
+fn create_portal_group(
+    address: &str,
+    port_no: u16,
+    pg_no: c_int,
+) -> Result<()> {
     let portal_port = CString::new(port_no.to_string()).unwrap();
     let portal_host = CString::new(address.to_owned()).unwrap();
     let pg = unsafe { spdk_iscsi_portal_grp_create(pg_no) };
@@ -257,7 +273,10 @@ fn create_portal_group(address: &str, port_no: u16, pg_no: c_int) -> Result<()> 
             return Err(Error::RegisterPortalGroup {});
         }
     }
-    info!("Created iscsi portal group no {}, address {}, port {}", pg_no, address, port_no);
+    info!(
+        "Created iscsi portal group no {}, address {}, port {}",
+        pg_no, address, port_no
+    );
     Ok(())
 }
 

@@ -16,18 +16,10 @@ use serde::Serialize;
 use snafu::{ResultExt, Snafu};
 
 use spdk_sys::{
-    spdk_bdev,
-    spdk_bdev_desc,
-    spdk_bdev_io,
-    spdk_bdev_io_get_buf,
-    spdk_bdev_readv_blocks,
-    spdk_bdev_register,
-    spdk_bdev_unmap_blocks,
-    spdk_bdev_unregister,
-    spdk_bdev_writev_blocks,
-    spdk_io_channel,
-    spdk_io_device_register,
-    spdk_io_device_unregister,
+    spdk_bdev, spdk_bdev_desc, spdk_bdev_io, spdk_bdev_io_get_buf,
+    spdk_bdev_readv_blocks, spdk_bdev_register, spdk_bdev_unmap_blocks,
+    spdk_bdev_unregister, spdk_bdev_writev_blocks, spdk_io_channel,
+    spdk_io_device_register, spdk_io_device_unregister,
 };
 
 use rpc::mayastor::{RebuildProgressReply, RebuildStateReply};
@@ -67,14 +59,20 @@ pub enum Error {
     CreateCryptoBdev { source: Errno, name: String },
     #[snafu(display("Failed to destroy crypto bdev for nexus {}", name))]
     DestroyCryptoBdev { source: Errno, name: String },
-    #[snafu(display("The nexus {} has been already shared with a different protocol", name))]
+    #[snafu(display(
+        "The nexus {} has been already shared with a different protocol",
+        name
+    ))]
     AlreadyShared { name: String },
     #[snafu(display("The nexus {} has not been shared", name))]
     NotShared { name: String },
     #[snafu(display("Failed to share nexus over NBD {}", name))]
     ShareNbdNexus { source: NbdError, name: String },
     #[snafu(display("Failed to share iscsi nexus {}", name))]
-    ShareIscsiNexus { source: NexusIscsiError, name: String },
+    ShareIscsiNexus {
+        source: NexusIscsiError,
+        name: String,
+    },
     #[snafu(display("Failed to allocate label of nexus {}", name))]
     AllocLabel { source: DmaError, name: String },
     #[snafu(display("Failed to write label of nexus {}", name))]
@@ -150,48 +148,24 @@ pub enum Error {
         reason: String,
     },
     #[snafu(display("Invalid ShareProtocol value {}", sp_value))]
-    InvalidShareProtocol { sp_value: i32},
+    InvalidShareProtocol { sp_value: i32 },
 }
 
 impl RpcErrorCode for Error {
     fn rpc_error_code(&self) -> Code {
         match self {
-            Error::NexusNotFound {
-                ..
-            } => Code::NotFound,
-            Error::InvalidUuid {
-                ..
-            } => Code::InvalidParams,
-            Error::InvalidKey {
-                ..
-            } => Code::InvalidParams,
-            Error::AlreadyShared {
-                ..
-            } => Code::InvalidParams,
-            Error::NotShared {
-                ..
-            } => Code::InvalidParams,
-            Error::CreateChild {
-                ..
-            } => Code::InvalidParams,
-            Error::MixedBlockSizes {
-                ..
-            } => Code::InvalidParams,
-            Error::ChildGeometry {
-                ..
-            } => Code::InvalidParams,
-            Error::OpenChild {
-                ..
-            } => Code::InvalidParams,
-            Error::DestroyLastChild {
-                ..
-            } => Code::InvalidParams,
-            Error::ChildNotFound {
-                ..
-            } => Code::NotFound,
-            Error::InvalidShareProtocol {
-                ..
-            } => Code::InvalidParams,
+            Error::NexusNotFound { .. } => Code::NotFound,
+            Error::InvalidUuid { .. } => Code::InvalidParams,
+            Error::InvalidKey { .. } => Code::InvalidParams,
+            Error::AlreadyShared { .. } => Code::InvalidParams,
+            Error::NotShared { .. } => Code::InvalidParams,
+            Error::CreateChild { .. } => Code::InvalidParams,
+            Error::MixedBlockSizes { .. } => Code::InvalidParams,
+            Error::ChildGeometry { .. } => Code::InvalidParams,
+            Error::OpenChild { .. } => Code::InvalidParams,
+            Error::DestroyLastChild { .. } => Code::InvalidParams,
+            Error::ChildNotFound { .. } => Code::NotFound,
+            Error::InvalidShareProtocol { .. } => Code::InvalidParams,
             _ => Code::InternalError,
         }
     }
@@ -207,8 +181,8 @@ pub enum NexusTarget {
 impl fmt::Debug for NexusTarget {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            NexusTarget::NbdDisk( disk ) => fmt::Debug::fmt(&disk, f),
-            NexusTarget::NexusIscsiTarget( tgt ) => fmt::Debug::fmt(&tgt, f),
+            NexusTarget::NbdDisk(disk) => fmt::Debug::fmt(&disk, f),
+            NexusTarget::NexusIscsiTarget(tgt) => fmt::Debug::fmt(&tgt, f),
         }
     }
 }

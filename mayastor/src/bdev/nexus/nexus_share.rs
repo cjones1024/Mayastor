@@ -8,13 +8,8 @@ use spdk_sys::create_crypto_disk;
 use crate::{
     bdev::nexus::{
         nexus_bdev::{
-            CreateCryptoBdev,
-            DestroyCryptoBdev,
-            Error,
-            Nexus,
-            NexusTarget,
-            ShareIscsiNexus,
-            ShareNbdNexus,
+            CreateCryptoBdev, DestroyCryptoBdev, Error, Nexus, NexusTarget,
+            ShareIscsiNexus, ShareNbdNexus,
         },
         nexus_iscsi::NexusIscsiTarget,
         nexus_nbd::NbdDisk,
@@ -23,9 +18,7 @@ use crate::{
     ffihelper::{cb_arg, done_errno_cb, errno_result_from_i32, ErrnoResult},
 };
 
-use rpc::mayastor::{
-    ShareProtocolNexus,
-};
+use rpc::mayastor::ShareProtocolNexus;
 
 /// we are using the multi buffer encryption implementation using CBC as the
 /// algorithm
@@ -37,29 +30,32 @@ impl Nexus {
         share_protocol: ShareProtocolNexus,
         key: Option<String>,
     ) -> Result<String, Error> {
-
         // We could already be shared -- as CSI is idempotent chances are we get called for some odd reason.
         // Validate indeed -- that we are shared by walking the target.
         // If so, and the protocol is correct simply return Ok().
         // If so, and the protocol is incorrect, return Error().
         // If we are not shared but the variant says we should be, carry on to correct the state.
         match self.nexus_target {
-            Some(NexusTarget::NbdDisk( ref nbd_disk )) => {
+            Some(NexusTarget::NbdDisk(ref nbd_disk)) => {
                 if share_protocol != ShareProtocolNexus::NexusNbd {
-                    return Err(Error::AlreadyShared { name: self.name.clone(),});
+                    return Err(Error::AlreadyShared {
+                        name: self.name.clone(),
+                    });
                 } else {
                     warn!("{} is already shared", self.name);
                     return Ok(nbd_disk.get_path());
                 }
-            },
-            Some(NexusTarget::NexusIscsiTarget( ref iscsi_target )) => {
+            }
+            Some(NexusTarget::NexusIscsiTarget(ref iscsi_target)) => {
                 if share_protocol != ShareProtocolNexus::NexusIscsi {
-                    return Err(Error::AlreadyShared { name: self.name.clone(),});
+                    return Err(Error::AlreadyShared {
+                        name: self.name.clone(),
+                    });
                 } else {
                     warn!("{} is already shared", self.name);
                     return Ok(iscsi_target.get_uri());
                 }
-            },
+            }
             None => (),
         }
 
@@ -105,22 +101,26 @@ impl Nexus {
                         name: self.name.clone(),
                     })?;
                 let device_path = nbd_disk.get_path();
-                self.nexus_target = Some(NexusTarget::NbdDisk( nbd_disk ));
+                self.nexus_target = Some(NexusTarget::NbdDisk(nbd_disk));
                 device_path
-            },
+            }
             ShareProtocolNexus::NexusIscsi => {
                 // Publish the nexus to system using an iscsi target and return the IQN
-                let iscsi_target =
-                    NexusIscsiTarget::create(&name).context(ShareIscsiNexus {
+                let iscsi_target = NexusIscsiTarget::create(&name).context(
+                    ShareIscsiNexus {
                         name: self.name.clone(),
-                    })?;
+                    },
+                )?;
                 let uri = iscsi_target.get_uri();
-                self.nexus_target = Some(NexusTarget::NexusIscsiTarget( iscsi_target ));
+                self.nexus_target =
+                    Some(NexusTarget::NexusIscsiTarget(iscsi_target));
                 uri
-            },
+            }
             ShareProtocolNexus::NexusNvmf => {
-                return Err(Error::InvalidShareProtocol {sp_value: share_protocol as i32})
-            },
+                return Err(Error::InvalidShareProtocol {
+                    sp_value: share_protocol as i32,
+                })
+            }
         };
         self.share_handle = Some(name);
         Ok(device_id)
@@ -131,15 +131,14 @@ impl Nexus {
     /// bdev. As such, we must first destroy the share and move our way down
     /// from there.
     pub async fn unshare(&mut self) -> Result<(), Error> {
-
         match self.nexus_target.take() {
-            Some(NexusTarget::NbdDisk( disk )) =>  {
+            Some(NexusTarget::NbdDisk(disk)) => {
                 disk.destroy();
-            },
+            }
             Some(NexusTarget::NexusIscsiTarget(iscsi_target)) => {
                 iscsi_target.destroy().await;
-            },
-            None =>  {
+            }
+            None => {
                 warn!("{} was not shared", self.name);
                 return Ok(());
             }
@@ -147,7 +146,6 @@ impl Nexus {
 
         let bdev_name = self.share_handle.take().unwrap();
         if let Some(bdev) = Bdev::lookup_by_name(&bdev_name) {
-
             // if the share handle is the same as bdev name it
             // implies there is no top level bdev, and we are done
             if self.name != bdev.name() {
@@ -160,11 +158,11 @@ impl Nexus {
                         cb_arg(s),
                     );
                 }
-                r.await
-                    .expect("crypto delete sender is gone")
-                    .context(DestroyCryptoBdev {
+                r.await.expect("crypto delete sender is gone").context(
+                    DestroyCryptoBdev {
                         name: self.name.clone(),
-                    })?;
+                    },
+                )?;
             }
         } else {
             warn!("Missing bdev for a shared device");
@@ -176,7 +174,7 @@ impl Nexus {
     /// shared as nbd.
     pub fn get_share_path(&self) -> Option<String> {
         match self.nexus_target {
-            Some(NexusTarget::NbdDisk( ref disk )) => Some(disk.get_path()),
+            Some(NexusTarget::NbdDisk(ref disk)) => Some(disk.get_path()),
             _ => None,
         }
     }

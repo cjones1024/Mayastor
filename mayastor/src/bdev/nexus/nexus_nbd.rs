@@ -19,9 +19,7 @@ use nix::{convert_ioctl_res, errno::Errno, libc};
 use snafu::{ResultExt, Snafu};
 
 use spdk_sys::{
-    spdk_nbd_disk,
-    spdk_nbd_disk_find_by_nbd_path,
-    spdk_nbd_get_path,
+    spdk_nbd_disk, spdk_nbd_disk_find_by_nbd_path, spdk_nbd_get_path,
     spdk_nbd_start,
 };
 
@@ -62,7 +60,7 @@ pub(crate) fn wait_until_ready(path: &str) -> Result<(), ()> {
     // start a thread that loops and tries to open us and asks for our size
     thread::spawn(move || {
         let size: u64 = 0;
-        for _i in 1i32 .. 100 {
+        for _i in 1i32..100 {
             std::thread::sleep(Duration::from_millis(1));
             let f = OpenOptions::new().read(true).open(Path::new(&tpath));
             if f.is_err() {
@@ -106,7 +104,7 @@ pub fn find_unused() -> Result<String, NbdError> {
         parse_value(Path::new("/sys/class/modules/nbd/parameters"), "nbds_max")
             .unwrap_or(16);
 
-    for i in 0 .. nbd_max {
+    for i in 0..nbd_max {
         let name = format!("nbd{}", i);
         match parse_value::<u32>(
             Path::new(&format!("/sys/class/block/{}", name)),
@@ -214,9 +212,7 @@ impl NbdDisk {
         wait_until_ready(&device_path).unwrap();
         info!("Started nbd disk {} for {}", device_path, bdev_name);
 
-        Ok(Self {
-            nbd_ptr,
-        })
+        Ok(Self { nbd_ptr })
     }
 
     /// Stop and release nbd device.

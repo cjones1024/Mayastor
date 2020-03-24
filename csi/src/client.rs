@@ -17,9 +17,15 @@ use rpc::service::mayastor_client::MayastorClient;
 fn parse_share_protocol(pcol: Option<&str>) -> Result<i32, Status> {
     match pcol {
         None => Ok(rpc::mayastor::ShareProtocolReplica::ReplicaNone as i32),
-        Some("nvmf") => Ok(rpc::mayastor::ShareProtocolReplica::ReplicaNvmf as i32),
-        Some("iscsi") => Ok(rpc::mayastor::ShareProtocolReplica::ReplicaIscsi as i32),
-        Some("none") => Ok(rpc::mayastor::ShareProtocolReplica::ReplicaNone as i32),
+        Some("nvmf") => {
+            Ok(rpc::mayastor::ShareProtocolReplica::ReplicaNvmf as i32)
+        }
+        Some("iscsi") => {
+            Ok(rpc::mayastor::ShareProtocolReplica::ReplicaIscsi as i32)
+        }
+        Some("none") => {
+            Ok(rpc::mayastor::ShareProtocolReplica::ReplicaNone as i32)
+        }
         Some(_) => Err(Status::new(
             Code::Internal,
             "Invalid value of share protocol".to_owned(),
@@ -67,9 +73,7 @@ async fn destroy_pool(
     }
 
     client
-        .destroy_pool(Request::new(rpc::mayastor::DestroyPoolRequest {
-            name,
-        }))
+        .destroy_pool(Request::new(rpc::mayastor::DestroyPoolRequest { name }))
         .await?;
 
     Ok(())

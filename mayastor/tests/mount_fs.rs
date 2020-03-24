@@ -5,9 +5,7 @@ use mayastor::{
     core::{mayastor_env_stop, MayastorCliArgs, MayastorEnvironment, Reactor},
 };
 
-use rpc::mayastor::{
-    ShareProtocolNexus,
-};
+use rpc::mayastor::ShareProtocolNexus;
 
 static DISKNAME1: &str = "/tmp/disk1.img";
 static BDEVNAME1: &str = "aio:///tmp/disk1.img?blk_size=512";
@@ -25,7 +23,10 @@ fn mount_fs() {
         let nexus = nexus_lookup("nexus").unwrap();
 
         //TODO: repeat this test for NVMF and ISCSI
-        let device = nexus.share(ShareProtocolNexus::NexusNbd, None).await.unwrap();
+        let device = nexus
+            .share(ShareProtocolNexus::NexusNbd, None)
+            .await
+            .unwrap();
         let (s, r) = unbounded();
 
         // create an XFS filesystem on the nexus device, mount it, create a file
@@ -52,8 +53,14 @@ fn mount_fs() {
 
         // share both nexuses
         //TODO: repeat this test for NVMF and ISCSI, and permutations?
-        let left_device = left.share(ShareProtocolNexus::NexusNbd, None).await.unwrap();
-        let right_device = right.share(ShareProtocolNexus::NexusNbd, None).await.unwrap();
+        let left_device = left
+            .share(ShareProtocolNexus::NexusNbd, None)
+            .await
+            .unwrap();
+        let right_device = right
+            .share(ShareProtocolNexus::NexusNbd, None)
+            .await
+            .unwrap();
 
         let s1 = s.clone();
         std::thread::spawn(move || {
@@ -99,10 +106,13 @@ fn mount_fs_1() {
         let nexus = nexus_lookup("nexus").unwrap();
 
         //TODO: repeat this test for NVMF and ISCSI
-        let device = nexus.share(ShareProtocolNexus::NexusNbd, None).await.unwrap();
+        let device = nexus
+            .share(ShareProtocolNexus::NexusNbd, None)
+            .await
+            .unwrap();
 
         std::thread::spawn(move || {
-            for _i in 0 .. 10 {
+            for _i in 0..10 {
                 common::mount_umount(&device);
             }
             s.send("".into())
@@ -121,7 +131,10 @@ fn mount_fs_2() {
         let nexus = nexus_lookup("nexus").unwrap();
 
         //TODO: repeat this test for NVMF and ISCSI
-        let device = nexus.share(ShareProtocolNexus::NexusNbd, None).await.unwrap();
+        let device = nexus
+            .share(ShareProtocolNexus::NexusNbd, None)
+            .await
+            .unwrap();
         let (s, r) = unbounded::<String>();
 
         std::thread::spawn(move || s.send(common::fio_run_verify(&device)));

@@ -25,7 +25,7 @@ pub(crate) fn parse_size(src: &str) -> Result<u64, String> {
     }
 }
 
-pub (crate) fn parse_proto(src: &str) -> Result<ShareProtocolNexus, &str> {
+pub(crate) fn parse_proto(src: &str) -> Result<ShareProtocolNexus, &str> {
     match src.to_lowercase().trim() {
         "nbd" => Ok(ShareProtocolNexus::NexusNbd),
         "nvmf" => Ok(ShareProtocolNexus::NexusNvmf),

@@ -1,12 +1,8 @@
 use mayastor::{
     bdev::{nexus_create, nexus_lookup},
     core::{
-        mayastor_env_stop,
-        Bdev,
-        BdevHandle,
-        MayastorCliArgs,
-        MayastorEnvironment,
-        Reactor,
+        mayastor_env_stop, Bdev, BdevHandle, MayastorCliArgs,
+        MayastorEnvironment, Reactor,
     },
     nexus_uri::{bdev_create, bdev_destroy},
 };

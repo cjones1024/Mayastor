@@ -91,7 +91,10 @@ enum Sub {
         uuid: String,
         /// Protocol to use when sharing the nexus.
         /// Can be NVMf, ISCSI, NBD
-        #[structopt(name = "protocol", parse(try_from_str = "convert::parse_proto"))]
+        #[structopt(
+            name = "protocol",
+            parse(try_from_str = "convert::parse_proto")
+        )]
         protocol: ShareProtocolNexus,
         /// 128 bit encryption key to be used for encrypting the data section
         /// of the nexus.
@@ -130,9 +133,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             )
             .await?,
         )?,
-        Sub::Destroy {
-            uuid,
-        } => serde_json::to_string_pretty(
+        Sub::Destroy { uuid } => serde_json::to_string_pretty(
             &call(&opt.socket, "destroy_nexus", Some(json!({ "uuid": uuid })))
                 .await?,
         )?,
@@ -144,10 +145,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             )
             .await?,
         )?,
-        Sub::Offline {
-            uuid,
-            uri,
-        } => serde_json::to_string_pretty(
+        Sub::Offline { uuid, uri } => serde_json::to_string_pretty(
             &call(
                 &opt.socket,
                 "offline_child",
@@ -159,10 +157,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             )
             .await?,
         )?,
-        Sub::Online {
-            uuid,
-            uri,
-        } => serde_json::to_string_pretty(
+        Sub::Online { uuid, uri } => serde_json::to_string_pretty(
             &call(
                 &opt.socket,
                 "online_child",
@@ -190,9 +185,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             .await?,
         )?,
 
-        Sub::Unpublish {
-            uuid,
-        } => serde_json::to_string_pretty(
+        Sub::Unpublish { uuid } => serde_json::to_string_pretty(
             &call(
                 &opt.socket,
                 "unpublish_nexus",
@@ -200,10 +193,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             )
             .await?,
         )?,
-        Sub::Raw {
-            method,
-            arg,
-        } => {
+        Sub::Raw { method, arg } => {
             if let Some(arg) = arg {
                 let args: serde_json::Value = serde_json::from_str(&arg)?;
 
