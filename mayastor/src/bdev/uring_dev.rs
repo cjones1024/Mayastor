@@ -52,8 +52,11 @@ impl UringBdev {
             if !spdk_bdev_ptr.is_null() {
                 Ok(name)
             } else {
-                errno_result_from_i32(name.clone(), -1)
-                    .context(nexus_uri::InvalidParams { name })
+                errno_result_from_i32(name.clone(), -1).context(
+                    nexus_uri::InvalidParams {
+                        name,
+                    },
+                )
             }
         }
         .await

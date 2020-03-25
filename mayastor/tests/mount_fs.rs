@@ -112,7 +112,7 @@ fn mount_fs_1() {
             .unwrap();
 
         std::thread::spawn(move || {
-            for _i in 0..10 {
+            for _i in 0 .. 10 {
                 common::mount_umount(&device);
             }
             s.send("".into())

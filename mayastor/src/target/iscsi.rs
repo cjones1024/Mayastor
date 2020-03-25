@@ -151,13 +151,13 @@ fn share_as_iscsi_target(
 
     let tgt = unsafe {
         spdk_iscsi_tgt_node_construct(
-            idx,                                    // target_index
-            c_iqn.as_ptr(),                         // name
-            ptr::null(),                            // alias
-            &mut pg_idx as *mut _,                  // pg_tag_list
-            &mut ig_idx as *mut _,                  // ig_tag_list
-            1,                                      /* portal and initiator
-                                                     * group list length */
+            idx,                   // target_index
+            c_iqn.as_ptr(),        // name
+            ptr::null(),           // alias
+            &mut pg_idx as *mut _, // pg_tag_list
+            &mut ig_idx as *mut _, // ig_tag_list
+            1,                     /* portal and initiator
+                                    * group list length */
             &mut spdk_bdev_get_name(bdev.as_ptr()), /* bdev name, how iscsi
                                                      * target gets
                                                      * associated with a

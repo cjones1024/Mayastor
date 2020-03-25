@@ -2,7 +2,11 @@ use std::process::Command;
 
 use mayastor::{
     core::{
-        mayastor_env_stop, Bdev, MayastorCliArgs, MayastorEnvironment, Reactor,
+        mayastor_env_stop,
+        Bdev,
+        MayastorCliArgs,
+        MayastorEnvironment,
+        Reactor,
     },
     nexus_uri::bdev_create,
 };
